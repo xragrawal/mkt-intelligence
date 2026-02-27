@@ -163,6 +163,7 @@ serve(async (req) => {
 
     // Deduplicate
     const deduped = deduplicateArticles(allArticles);
+    const afterDedup = deduped.length;
 
     // Filter to last 7 days
     const filterDays = 7;
@@ -172,6 +173,7 @@ serve(async (req) => {
       if (!a.published_at) return true;
       return new Date(a.published_at) >= cutoff;
     });
+    const afterDateFilter = filtered.length;
 
     // Store (limit 20 for MVP — expand later)
     const toStore = filtered.slice(0, 20);
@@ -186,7 +188,6 @@ serve(async (req) => {
         batch_id: batchId,
       }));
 
-      // Upsert to handle existing IDs
       const { error: insertError } = await supabase
         .from("collected_articles")
         .upsert(rows, { onConflict: "id" });
@@ -219,10 +220,15 @@ serve(async (req) => {
           keywords,
           articles_collected: totalCollected,
           articles_stored: toStore.length,
+          after_dedup: afterDedup,
+          after_date_filter: afterDateFilter,
+          duplicates_removed: totalCollected - afterDedup,
+          date_filtered: afterDedup - afterDateFilter,
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           status: "completed",
         },
+        articles: toStore,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

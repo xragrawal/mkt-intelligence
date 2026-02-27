@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, ChevronDown, ChevronUp, ExternalLink, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DEFAULT_KEYWORDS } from "@/lib/types";
-import type { CollectionRunSummary } from "@/lib/types";
+import type { CollectionRunSummary, CollectedArticle } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -17,6 +17,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [inputValue, setInputValue] = useState("");
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [collectedArticles, setCollectedArticles] = useState<CollectedArticle[]>([]);
+  const [showArticles, setShowArticles] = useState(false);
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
@@ -37,6 +39,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
     }
     setIsCollecting(true);
     setError(null);
+    setCollectedArticles([]);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke("collect-news", {
@@ -47,7 +50,11 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
       if (data?.error) throw new Error(data.error);
 
       onRunComplete(data.run);
-      toast.success(`Collected ${data.run.articles_stored} articles`);
+      if (data.articles) {
+        setCollectedArticles(data.articles);
+        setShowArticles(true);
+      }
+      toast.success(`Stored ${data.run.articles_stored} articles (${data.run.articles_collected} fetched)`);
     } catch (e: any) {
       setError(e.message);
       toast.error("Collection failed: " + e.message);
@@ -64,7 +71,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         </div>
         <div>
           <h2 className="text-lg font-display font-semibold text-foreground">News Collection</h2>
-          <p className="text-sm text-muted-foreground">Gather the latest articles from configured sources</p>
+          <p className="text-sm text-muted-foreground">Gather the latest articles from Google News RSS</p>
         </div>
       </div>
 
@@ -125,30 +132,93 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         )}
       </div>
 
-      {/* Run summary */}
+      {/* Run summary with pipeline breakdown */}
       {lastRun && (
-        <div className="rounded-lg bg-muted/50 border border-border p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="text-muted-foreground">Run ID</span>
-            <p className="font-mono text-xs text-foreground truncate">{lastRun.id}</p>
+        <div className="space-y-3">
+          <div className="rounded-lg bg-muted/50 border border-border p-4 space-y-3">
+            {/* Pipeline funnel */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span className="text-foreground capitalize font-medium">{lastRun.status}</span>
+              <span>•</span>
+              <span className="font-mono">{lastRun.id}</span>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <PipelineStat label="Fetched from RSS" value={lastRun.articles_collected} />
+              {lastRun.duplicates_removed !== undefined && (
+                <PipelineStat label="Duplicates removed" value={lastRun.duplicates_removed} variant="dimmed" />
+              )}
+              {lastRun.after_dedup !== undefined && (
+                <PipelineStat label="After dedup" value={lastRun.after_dedup} />
+              )}
+              {lastRun.date_filtered !== undefined && lastRun.date_filtered > 0 && (
+                <PipelineStat label="Older than 7d" value={lastRun.date_filtered} variant="dimmed" />
+              )}
+              <PipelineStat label="Stored" value={lastRun.articles_stored} variant="highlight" />
+            </div>
+
+            {lastRun.articles_stored === 0 && (
+              <p className="text-xs text-destructive/80 bg-destructive/10 rounded-md px-3 py-2">
+                No articles passed the dedup + date filter. Try different keywords or check if Google News has fresh results for your terms.
+              </p>
+            )}
           </div>
-          <div>
-            <span className="text-muted-foreground">Collected</span>
-            <p className="text-foreground font-semibold">{lastRun.articles_collected}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Stored</span>
-            <p className="text-foreground font-semibold">{lastRun.articles_stored}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Status</span>
-            <p className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-              <span className="text-foreground capitalize">{lastRun.status}</span>
-            </p>
-          </div>
+
+          {/* Collected articles list */}
+          {collectedArticles.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowArticles(!showArticles)}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showArticles ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {collectedArticles.length} collected articles
+              </button>
+              
+              {showArticles && (
+                <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                  {collectedArticles.map((a) => (
+                    <div key={a.id} className="flex items-start gap-2 rounded-md bg-muted/30 border border-border/50 px-3 py-2 text-xs">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-foreground leading-snug line-clamp-1">{a.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
+                          {a.publishing_agency && <span>{a.publishing_agency}</span>}
+                          {a.published_at && (
+                            <span>{new Date(a.published_at).toLocaleDateString()}</span>
+                          )}
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">{a.keyword}</Badge>
+                        </div>
+                      </div>
+                      <a
+                        href={a.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:text-primary/80 shrink-0 mt-0.5"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </section>
+  );
+}
+
+function PipelineStat({ label, value, variant }: { label: string; value: number; variant?: "dimmed" | "highlight" }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-muted-foreground text-xs">{label}</span>
+      <span className={`font-display font-bold text-sm tabular-nums ${
+        variant === "highlight" ? "text-primary" : variant === "dimmed" ? "text-muted-foreground" : "text-foreground"
+      }`}>
+        {value}
+      </span>
+    </div>
   );
 }
