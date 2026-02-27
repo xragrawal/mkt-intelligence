@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { Sparkles, Loader2, Trash2, CheckCircle2, Archive, Users, Briefcase, XCircle } from "lucide-react";
+import { Sparkles, Loader2, Trash2, CheckCircle2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ScoredArticle, OpportunityPack, LeadStatus } from "@/lib/types";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +22,7 @@ interface EnrichedResult {
   status: LeadStatus;
 }
 
-const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived"];
+const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
 
 export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
   const [isEnriching, setIsEnriching] = useState(false);
@@ -28,8 +30,9 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
   const [results, setResults] = useState<EnrichedResult[]>([]);
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "detail">("table");
+  const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
 
-  // Load existing opportunity packs on mount
   useEffect(() => {
     loadExistingPacks();
   }, []);
@@ -85,12 +88,18 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
   const handleDeepDive = async () => {
     setIsEnriching(true);
     setCurrentIndex(0);
-    const newResults: EnrichedResult[] = [];
 
     try {
       for (let i = 0; i < selectedArticles.length; i++) {
         const sa = selectedArticles[i];
         setCurrentIndex(i + 1);
+
+        // Check if already exists by URL
+        const existingIdx = results.findIndex((r) => r.articleUrl === sa.article.url);
+        if (existingIdx !== -1) {
+          toast.info(`Skipping "${sa.article.title}" — already analysed`);
+          continue;
+        }
 
         const { data, error } = await supabase.functions.invoke("deep-dive", {
           body: {
@@ -107,24 +116,18 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
         }
 
         if (data?.pack) {
-          newResults.push({
+          const newResult: EnrichedResult = {
             articleUrl: sa.article.url,
             articleTitle: sa.article.title,
             pack: data.pack,
             dbId: data.dbId,
             status: "open",
-          });
+          };
+          // Stream 1 by 1: update results immediately
+          setResults((prev) => [newResult, ...prev]);
+          toast.success(`Analysed: ${data.pack.companyProfile.companyName}`);
         }
       }
-
-      // Merge new results with existing, avoiding duplicates by URL
-      setResults((prev) => {
-        const existingUrls = new Set(prev.map((r) => r.articleUrl));
-        const unique = newResults.filter((r) => !existingUrls.has(r.articleUrl));
-        return [...unique, ...prev];
-      });
-
-      toast.success(`Generated ${newResults.length} opportunity packs`);
     } catch (e: any) {
       toast.error("Enrichment error: " + e.message);
     } finally {
@@ -132,8 +135,7 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
     }
   };
 
-  const handleStatusChange = async (index: number, newStatus: LeadStatus) => {
-    const result = results[index];
+  const handleStatusChange = async (result: EnrichedResult, newStatus: LeadStatus) => {
     if (result.dbId) {
       const { error } = await supabase
         .from("opportunity_packs")
@@ -144,16 +146,15 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
         return;
       }
     }
-    setResults(results.map((r, i) => (i === index ? { ...r, status: newStatus } : r)));
+    setResults((prev) => prev.map((r) => (r.dbId === result.dbId ? { ...r, status: newStatus } : r)));
     toast.success(`Marked as ${LEAD_STATUS_LABELS[newStatus]}`);
   };
 
-  const handleDelete = async (index: number) => {
-    const result = results[index];
+  const handleDelete = async (result: EnrichedResult) => {
     if (result.dbId) {
       await supabase.from("opportunity_packs").delete().eq("id", result.dbId);
     }
-    setResults(results.filter((_, i) => i !== index));
+    setResults((prev) => prev.filter((r) => r.dbId !== result.dbId));
     toast.success("Opportunity pack removed");
   };
 
@@ -170,12 +171,12 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
     <section className={`rounded-xl border border-border bg-card p-6 space-y-5 animate-slide-up ${!enabled && results.length === 0 ? "opacity-50 pointer-events-none" : ""}`}>
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-display font-bold text-primary">3</div>
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-display font-semibold text-foreground">Opportunity Intelligence</h2>
           <p className="text-sm text-muted-foreground">
             Deep analysis & CRM-ready action notes
             {enabled && selectedArticles.length > 0 && (
-              <span className="text-foreground"> • {selectedArticles.length} articles selected for deep dive</span>
+              <span className="text-foreground"> • {selectedArticles.length} selected</span>
             )}
           </p>
         </div>
@@ -188,38 +189,60 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
             {isEnriching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {isEnriching
               ? `Analysing ${currentIndex}/${selectedArticles.length}…`
-              : `Deep Dive on ${selectedArticles.length} Selected`}
+              : `Deep Dive (${selectedArticles.length})`}
           </Button>
         )}
 
         {results.length > 0 && (
-          <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-            <button
-              onClick={() => setStatusFilter("all")}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                statusFilter === "all" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              All ({results.length})
-            </button>
-            {STATUS_FILTERS.map((s) => {
-              const count = statusCounts[s] || 0;
-              if (count === 0) return null;
-              return (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                    statusFilter === s ? LEAD_STATUS_COLORS[s] : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {LEAD_STATUS_LABELS[s]} ({count})
-                </button>
-              );
-            })}
-          </div>
+          <>
+            <div className="flex items-center gap-1 ml-auto">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                title="Table view"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("detail")}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "detail" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                title="Detail view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+          </>
         )}
       </div>
+
+      {/* Status filter tabs */}
+      {results.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              statusFilter === "all" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All ({results.length})
+          </button>
+          {STATUS_FILTERS.map((s) => {
+            const count = statusCounts[s] || 0;
+            if (count === 0) return null;
+            return (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  statusFilter === s ? LEAD_STATUS_COLORS[s] : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {LEAD_STATUS_LABELS[s]} ({count})
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {isLoadingExisting && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -228,52 +251,151 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
         </div>
       )}
 
-      {filteredResults.length > 0 && (
-        <div className="space-y-2">
+      {/* TABLE VIEW */}
+      {filteredResults.length > 0 && viewMode === "table" && (
+        <div className="overflow-x-auto -mx-6 px-6">
+          <table className="w-full text-xs border-collapse min-w-0">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="py-2 pr-2 font-medium w-8">#</th>
+                <th className="py-2 pr-2 font-medium">Company</th>
+                <th className="py-2 pr-2 font-medium">Article</th>
+                <th className="py-2 pr-2 font-medium w-16 text-center">Score</th>
+                <th className="py-2 pr-2 font-medium w-20">Region</th>
+                <th className="py-2 pr-2 font-medium w-20">Status</th>
+                <th className="py-2 font-medium w-48 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredResults.map((r, i) => (
+                <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
+                  <td className="py-2.5 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
+                  <td className="py-2.5 pr-2 font-medium text-foreground">
+                    <div className="line-clamp-1">{r.pack.companyProfile.companyName}</div>
+                    <div className="text-[10px] text-muted-foreground">{r.pack.companyProfile.inferredIndustry}</div>
+                  </td>
+                  <td className="py-2.5 pr-2">
+                    <a
+                      href={r.articleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-foreground hover:text-primary hover:underline line-clamp-1 inline-flex items-center gap-1"
+                    >
+                      <span className="truncate max-w-[200px]">{r.articleTitle}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
+                    </a>
+                  </td>
+                  <td className="py-2.5 pr-2 text-center">
+                    <span className="font-display font-bold text-primary">{r.pack.bdOpportunityAssessment.opportunityScore}</span>
+                  </td>
+                  <td className="py-2.5 pr-2 text-muted-foreground truncate">{r.pack.companyProfile.deploymentRegion}</td>
+                  <td className="py-2.5 pr-2">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>
+                      {LEAD_STATUS_LABELS[r.status]}
+                    </span>
+                  </td>
+                  <td className="py-2.5 text-right">
+                    <div className="flex items-center gap-0.5 justify-end">
+                      {r.status !== "acted_internally" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground" title="Add to FlytBase CRM">
+                          <Briefcase className="w-3 h-3" /> CRM
+                        </Button>
+                      )}
+                      {r.status !== "shared_with_partners" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground" title="Share with Partner">
+                          <Users className="w-3 h-3" /> Partner
+                        </Button>
+                      )}
+                      {r.status !== "duplicate" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Mark as Duplicate">
+                          Dup
+                        </Button>
+                      )}
+                      {r.status !== "closed" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "closed")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-foreground" title="Close">
+                          <XCircle className="w-3 h-3" />
+                        </Button>
+                      )}
+                      {r.status !== "archived" && (
+                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "archived")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-foreground" title="Archive">
+                          <Archive className="w-3 h-3" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Delete">
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                      {/* Expand detail inline */}
+                      <Button variant="ghost" size="sm" onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-foreground" title="Expand detail">
+                        {expandedDetailId === r.dbId ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Expanded detail below table row */}
+          {expandedDetailId && (() => {
+            const r = filteredResults.find((r) => r.dbId === expandedDetailId);
+            if (!r) return null;
+            return (
+              <div className="mt-2 mb-4">
+                <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} pack={r.pack} />
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* DETAIL VIEW */}
+      {filteredResults.length > 0 && viewMode === "detail" && (
+        <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
             <span>{filteredResults.length} opportunity packs</span>
           </div>
           <div className="space-y-6">
-            {filteredResults.map((r, i) => {
-              const realIndex = results.indexOf(r);
-              return (
-                <div key={r.dbId || i} className="relative">
-                  <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} pack={r.pack} />
-                  {/* Status & actions bar */}
-                  <div className="flex items-center gap-2 px-5 py-3 border-t border-border bg-muted/20 rounded-b-xl">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${LEAD_STATUS_COLORS[r.status]}`}>
-                      {LEAD_STATUS_LABELS[r.status]}
-                    </span>
-                    <div className="flex items-center gap-1 ml-auto">
-                      {r.status !== "shared_with_partners" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(realIndex, "shared_with_partners")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                          <Users className="w-3.5 h-3.5" /> Share
-                        </Button>
-                      )}
-                      {r.status !== "acted_internally" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(realIndex, "acted_internally")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                          <Briefcase className="w-3.5 h-3.5" /> Act
-                        </Button>
-                      )}
-                      {r.status !== "closed" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(realIndex, "closed")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                          <XCircle className="w-3.5 h-3.5" /> Close
-                        </Button>
-                      )}
-                      {r.status !== "archived" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(realIndex, "archived")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                          <Archive className="w-3.5 h-3.5" /> Archive
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(realIndex)} className="text-muted-foreground hover:text-destructive">
-                        <Trash2 className="w-4 h-4" />
+            {filteredResults.map((r) => (
+              <div key={r.dbId || r.articleUrl} className="relative">
+                <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} pack={r.pack} />
+                <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border bg-muted/20 rounded-b-xl flex-wrap">
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${LEAD_STATUS_COLORS[r.status]}`}>
+                    {LEAD_STATUS_LABELS[r.status]}
+                  </span>
+                  <div className="flex items-center gap-1 ml-auto flex-wrap">
+                    {r.status !== "acted_internally" && (
+                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
+                        <Briefcase className="w-3.5 h-3.5" /> Add to CRM
                       </Button>
-                    </div>
+                    )}
+                    {r.status !== "shared_with_partners" && (
+                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
+                        <Users className="w-3.5 h-3.5" /> Share with Partner
+                      </Button>
+                    )}
+                    {r.status !== "duplicate" && (
+                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
+                        Mark Duplicate
+                      </Button>
+                    )}
+                    {r.status !== "closed" && (
+                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "closed")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
+                        <XCircle className="w-3.5 h-3.5" /> Close
+                      </Button>
+                    )}
+                    {r.status !== "archived" && (
+                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "archived")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
+                        <Archive className="w-3.5 h-3.5" /> Archive
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}
