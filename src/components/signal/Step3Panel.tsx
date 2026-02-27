@@ -275,19 +275,19 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
 
       {/* TABLE VIEW */}
       {filteredResults.length > 0 && viewMode === "table" && (
-        <div className="space-y-2">
-          <table className="w-full text-xs border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse min-w-[700px]">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-2 font-medium w-8">#</th>
-                <th className="py-2 pr-2 font-medium">Company</th>
-                <th className="py-2 pr-2 font-medium w-28">Partner / SI</th>
-                <th className="py-2 pr-2 font-medium w-24">Location</th>
-                <th className="py-2 pr-2 font-medium w-20">Signal</th>
-                <th className="py-2 pr-2 font-medium w-14 text-center">Units</th>
-                <th className="py-2 pr-2 font-medium w-16">Confidence</th>
-                <th className="py-2 pr-2 font-medium w-20">Status</th>
-                <th className="py-2 font-medium w-36 text-right">Actions</th>
+                <th className="py-2 pr-1.5 font-medium">#</th>
+                <th className="py-2 pr-1.5 font-medium">Company</th>
+                <th className="py-2 pr-1.5 font-medium">Partner / SI</th>
+                <th className="py-2 pr-1.5 font-medium">Location</th>
+                <th className="py-2 pr-1.5 font-medium">Signal</th>
+                <th className="py-2 pr-1.5 font-medium text-center">Units</th>
+                <th className="py-2 pr-1.5 font-medium">Conf.</th>
+                <th className="py-2 pr-1.5 font-medium">Status</th>
+                <th className="py-2 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -296,61 +296,46 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
                 const location = [sc?.city, sc?.country].filter(Boolean).join(", ") || r.pack.companyProfile.deploymentRegion || "—";
                 const intentLabel = sc?.buyingIntentType ? SIGNAL_LABELS[sc.buyingIntentType as BuyingIntentType] || sc.buyingIntentType : r.pack.deploymentSignal.eventType || "—";
                 const confidence = sc?.confidence || "—";
-                const partner = sc?.partnerOrSI || r.pack.bdOpportunityAssessment.partnershipAngle?.split(".")[0] || "—";
+                const partner = sc?.partnerOrSI || "—";
                 const units = sc?.unitsMentioned;
 
                 return (
                   <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
-                    <td className="py-2.5 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
-                    <td className="py-2.5 pr-2">
-                      <div className="font-medium text-foreground line-clamp-1">{r.pack.companyProfile.companyName}</div>
-                      <a
-                        href={r.articleUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-primary hover:underline line-clamp-1 inline-flex items-center gap-1 text-[10px]"
-                      >
-                        <span className="truncate max-w-[200px]">{r.articleTitle}</span>
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
+                    <td className="py-2 pr-1.5 text-muted-foreground tabular-nums">{i + 1}</td>
+                    <td className="py-2 pr-1.5 max-w-[180px]">
+                      <div className="font-medium text-foreground truncate">{r.pack.companyProfile.companyName}</div>
+                      <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline truncate block text-[10px]">
+                        {r.articleTitle}
                       </a>
                     </td>
-                    <td className="py-2.5 pr-2 text-foreground truncate">{partner}</td>
-                    <td className="py-2.5 pr-2 text-foreground truncate">{location}</td>
-                    <td className="py-2.5 pr-2">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">
-                        {intentLabel}
-                      </Badge>
+                    <td className="py-2 pr-1.5 text-foreground truncate max-w-[100px]">{partner}</td>
+                    <td className="py-2 pr-1.5 text-foreground truncate max-w-[90px]">{location}</td>
+                    <td className="py-2 pr-1.5">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">{intentLabel}</Badge>
                     </td>
-                    <td className="py-2.5 pr-2 text-center tabular-nums text-foreground">{units ?? "—"}</td>
-                    <td className="py-2.5 pr-2">
-                      <span className={`text-[10px] font-medium ${confidence === "HIGH" ? "text-primary" : confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>
-                        {confidence}
-                      </span>
+                    <td className="py-2 pr-1.5 text-center tabular-nums text-foreground">{units ?? "—"}</td>
+                    <td className="py-2 pr-1.5">
+                      <span className={`text-[10px] font-medium ${confidence === "HIGH" ? "text-primary" : confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>{confidence}</span>
                     </td>
-                    <td className="py-2.5 pr-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>
-                        {LEAD_STATUS_LABELS[r.status]}
-                      </span>
+                    <td className="py-2 pr-1.5">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
                     </td>
-                    <td className="py-2.5 text-right">
-                      <div className="flex items-center gap-0.5 justify-end">
+                    <td className="py-2 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-0.5">
                         {r.status !== "acted_internally" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground" title="Add to FlytBase CRM">
-                            <Briefcase className="w-3 h-3" /> CRM
+                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1 text-muted-foreground hover:text-foreground" title="CRM">
+                            <Briefcase className="w-3 h-3" />
                           </Button>
                         )}
                         {r.status !== "duplicate" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Mark as Duplicate">
-                            Dup
+                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1 text-muted-foreground hover:text-destructive" title="Duplicate">
+                            <XCircle className="w-3 h-3" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Delete">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1 text-muted-foreground hover:text-destructive" title="Delete">
                           <Trash2 className="w-3 h-3" />
                         </Button>
-                        <button
-                          onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)}
-                          className="p-1 text-muted-foreground hover:text-foreground"
-                        >
+                        <button onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)} className="p-1 text-muted-foreground hover:text-foreground">
                           {expandedDetailId === r.dbId ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                         </button>
                       </div>
