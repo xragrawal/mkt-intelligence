@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callLLM, RateLimitError, CreditsExhaustedError } from "../_shared/llm.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -103,9 +104,6 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch articles from this batch
@@ -123,7 +121,7 @@ serve(async (req) => {
       });
     }
 
-    // ── Optimization 4: Check cache for already-scored articles ──
+    // Check cache for already-scored articles
     const articleIds = articles.map((a) => a.id);
     const { data: cached } = await supabase
       .from("scored_articles")
@@ -178,7 +176,6 @@ serve(async (req) => {
         for (const a of uncached) {
           const dropReason = shouldPreFilter(a.title);
           if (dropReason) {
-            // Cache the pre-filtered result too
             await supabase.from("scored_articles").upsert({
               article_id: a.id,
               batch_id: batchId,
@@ -198,7 +195,7 @@ serve(async (req) => {
           send({ type: "progress_note", message: `${preFilteredCount} articles pre-filtered (skipped)` });
         }
 
-        // ── Batch scoring with cheaper model ──
+        // ── Batch scoring ──
         const totalBatches = Math.ceil(toScore.length / BATCH_SIZE);
         let scored = 0;
 
@@ -211,59 +208,28 @@ serve(async (req) => {
             .join("\n\n");
 
           try {
-            const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "google/gemini-2.5-flash-lite",
-                messages: [
-                  { role: "system", content: SCORING_PROMPT },
-                  { role: "user", content: `Score these ${batch.length} articles:\n\n${articleList}` },
-                ],
-                tools: [BATCH_SCORING_TOOL],
-                tool_choice: { type: "function", function: { name: "score_articles_batch" } },
-              }),
+            const result = await callLLM({
+              systemPrompt: SCORING_PROMPT,
+              userMessage: `Score these ${batch.length} articles:\n\n${articleList}`,
+              tools: [BATCH_SCORING_TOOL],
+              toolChoice: { type: "function", function: { name: "score_articles_batch" } },
+              // For scoring, use a cheaper/faster model
+              model: undefined, // uses provider default (claude-sonnet-4 or gemini-3-flash)
             });
 
-            if (response.status === 429) {
-              send({ type: "error", message: "Rate limited — waiting before retry" });
-              await new Promise((r) => setTimeout(r, 5000));
-              b--; // Retry this batch
-              continue;
-            }
-
-            if (response.status === 402) {
-              send({ type: "error", message: "AI credits exhausted. Please add credits." });
-              break;
-            }
-
-            if (!response.ok) {
-              console.error("LLM error:", response.status, await response.text());
-              send({ type: "error", message: `Batch ${b + 1} scoring failed` });
-              scored += batch.length;
-              continue;
-            }
-
-            const data = await response.json();
-            const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-            if (!toolCall) {
+            if (!result.toolCall) {
               send({ type: "error", message: `No structured output for batch ${b + 1}` });
               scored += batch.length;
               continue;
             }
 
-            const { scores } = JSON.parse(toolCall.function.arguments);
+            const { scores } = JSON.parse(result.toolCall.arguments);
 
-            // Process each score in the batch
             for (const scan of scores) {
               const idx = scan.articleIndex;
               if (idx < 0 || idx >= batch.length) continue;
               const article = batch[idx];
 
-              // Cache to DB
               await supabase.from("scored_articles").upsert({
                 article_id: article.id,
                 batch_id: batchId,
@@ -290,16 +256,25 @@ serve(async (req) => {
             }
 
             scored += batch.length;
-            // Small delay between batches
             if (b < totalBatches - 1) await new Promise((r) => setTimeout(r, 500));
           } catch (e) {
+            if (e instanceof RateLimitError) {
+              send({ type: "error", message: "Rate limited — waiting before retry" });
+              await new Promise((r) => setTimeout(r, 5000));
+              b--;
+              continue;
+            }
+            if (e instanceof CreditsExhaustedError) {
+              send({ type: "error", message: e.message });
+              break;
+            }
             console.error(`Error scoring batch ${b + 1}:`, e);
             send({ type: "error", message: `Error: ${e instanceof Error ? e.message : "Unknown"}` });
             scored += batch.length;
           }
         }
 
-        // Post-scoring event dedup
+        // Post-scoring dedup
         const eventMap = new Map<string, typeof results[0]>();
         for (const r of results) {
           const key = [
