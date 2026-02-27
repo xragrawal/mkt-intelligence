@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, ChevronDown, ChevronUp, Table2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { DEFAULT_KEYWORDS } from "@/lib/types";
 import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +22,6 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [allFetched, setAllFetched] = useState<FetchedArticleSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineBreakdown | null>(null);
   const [showStored, setShowStored] = useState(false);
-  const [showAllFetched, setShowAllFetched] = useState(false);
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
@@ -137,7 +137,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
               <PipelineRow label="Fetched from RSS" value={pipeline.totalFetched} />
               <PipelineArrow dropped={pipeline.droppedByDedup} reason="duplicates removed" />
               <PipelineRow label="After dedup" value={pipeline.afterDedup} />
-              <PipelineArrow dropped={pipeline.droppedByDateFilter} reason="older than 7 days" />
+              <PipelineArrow dropped={pipeline.droppedByDateFilter} reason="older than 30 days" />
               <PipelineRow label="After date filter" value={pipeline.afterDateFilter} />
               {pipeline.droppedByCap > 0 && (
                 <>
@@ -156,21 +156,17 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
 
           {/* Stored articles */}
           {storedArticles.length > 0 && (
-            <ArticleList
+            <ArticleTableDialog
               label={`${storedArticles.length} stored articles (sent to scoring)`}
               articles={storedArticles}
-              show={showStored}
-              onToggle={() => setShowStored(!showStored)}
             />
           )}
 
           {/* All fetched articles */}
           {allFetched.length > 0 && (
-            <ArticleList
+            <ArticleTableDialog
               label={`${allFetched.length} total fetched articles (before filters)`}
               articles={allFetched}
-              show={showAllFetched}
-              onToggle={() => setShowAllFetched(!showAllFetched)}
             />
           )}
         </div>
@@ -201,45 +197,54 @@ function PipelineArrow({ dropped, reason }: { dropped: number; reason: string })
   );
 }
 
-function ArticleList({
+function ArticleTableDialog({
   label,
   articles,
-  show,
-  onToggle,
 }: {
   label: string;
   articles: Array<{ id: string; title: string; url: string; keyword: string; publishing_agency?: string | null; published_at?: string | null }>;
-  show: boolean;
-  onToggle: () => void;
 }) {
   return (
-    <div>
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {show ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        {label}
-      </button>
-      {show && (
-        <div className="mt-2 space-y-1.5 max-h-64 overflow-y-auto pr-1">
-          {articles.map((a) => (
-            <div key={a.id} className="flex items-start gap-2 rounded-md bg-muted/30 border border-border/50 px-3 py-2 text-xs">
-              <div className="flex-1 min-w-0">
-                <p className="text-foreground leading-snug line-clamp-1">{a.title}</p>
-                <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
-                  {a.publishing_agency && <span>{a.publishing_agency}</span>}
-                  {a.published_at && <span>{new Date(a.published_at).toLocaleDateString()}</span>}
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">{a.keyword}</Badge>
-                </div>
-              </div>
-              <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 shrink-0 mt-0.5">
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          ))}
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2 text-xs">
+          <Table2 className="w-3.5 h-3.5" />
+          {label}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="text-base font-display">{label}</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-auto flex-1 -mx-6 px-6">
+          <table className="w-full text-xs border-collapse">
+            <thead className="sticky top-0 bg-card z-10">
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="py-2 pr-3 font-medium w-8">#</th>
+                <th className="py-2 pr-3 font-medium">Title</th>
+                <th className="py-2 pr-3 font-medium w-32">Source</th>
+                <th className="py-2 pr-3 font-medium w-24">Keyword</th>
+                <th className="py-2 font-medium w-24">Published</th>
+              </tr>
+            </thead>
+            <tbody>
+              {articles.map((a, i) => (
+                <tr key={a.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <td className="py-2 pr-3 text-muted-foreground tabular-nums">{i + 1}</td>
+                  <td className="py-2 pr-3 text-foreground leading-snug">{a.title}</td>
+                  <td className="py-2 pr-3 text-muted-foreground">{a.publishing_agency || "—"}</td>
+                  <td className="py-2 pr-3">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">{a.keyword}</Badge>
+                  </td>
+                  <td className="py-2 text-muted-foreground tabular-nums">
+                    {a.published_at ? new Date(a.published_at).toLocaleDateString() : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
