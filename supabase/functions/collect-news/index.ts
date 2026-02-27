@@ -173,8 +173,8 @@ serve(async (req) => {
       return new Date(a.published_at) >= cutoff;
     });
 
-    // Store (limit 600)
-    const toStore = filtered.slice(0, 600);
+    // Store (limit 20 for MVP — expand later)
+    const toStore = filtered.slice(0, 20);
     if (toStore.length > 0) {
       const rows = toStore.map((a) => ({
         id: a.id,
