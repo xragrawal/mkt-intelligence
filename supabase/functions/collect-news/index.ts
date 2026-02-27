@@ -22,6 +22,24 @@ function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Extract significant words from a title for fuzzy matching.
+ * Returns a set of "content words" (3+ chars, lowercased, no stop words).
+ */
+const STOP_WORDS = new Set(["the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her", "was", "one", "our", "out", "has", "its", "how", "who", "what", "when", "where", "why", "with", "from", "they", "been", "have", "will", "this", "that", "than", "then", "into", "over", "also", "new", "more"]);
+
+function getContentWords(title: string): Set<string> {
+  const words = normalizeTitle(title).split(" ");
+  return new Set(words.filter(w => w.length >= 3 && !STOP_WORDS.has(w)));
+}
+
+function titleSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let overlap = 0;
+  for (const w of a) { if (b.has(w)) overlap++; }
+  return overlap / Math.min(a.size, b.size);
+}
+
 function getUrlSlug(url: string): string {
   try {
     const u = new URL(url);
@@ -33,29 +51,49 @@ function getUrlSlug(url: string): string {
 
 /**
  * Resolve Google News redirect URLs to actual article URLs.
- * Google News RSS links look like: https://news.google.com/rss/articles/...
- * We follow the redirect to get the real publisher URL.
+ * Strategy: Follow redirects. If still on news.google.com, try extracting from consent page.
  */
 async function resolveGoogleNewsUrl(url: string): Promise<string> {
   if (!url.includes("news.google.com")) return url;
   try {
+    // Try following redirects with GET (HEAD often doesn't work with Google)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const resp = await fetch(url, {
-      method: "HEAD",
       redirect: "follow",
-      headers: { "User-Agent": "Signal/1.0" },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+      signal: controller.signal,
     });
-    // The final URL after redirects is the actual article
-    if (resp.url && !resp.url.includes("news.google.com")) {
+    clearTimeout(timeout);
+
+    // Check if redirected to actual article
+    if (resp.url && !resp.url.includes("news.google.com") && !resp.url.includes("consent.google.com")) {
       return resp.url;
     }
-    // Try GET if HEAD didn't resolve
-    const getResp = await fetch(url, {
-      redirect: "follow",
-      headers: { "User-Agent": "Signal/1.0" },
-    });
-    if (getResp.url && !getResp.url.includes("news.google.com")) {
-      return getResp.url;
+
+    // Try parsing the HTML for meta refresh or canonical URL
+    const html = await resp.text();
+    
+    // Look for data-redirect attribute or canonical link
+    const canonicalMatch = html.match(/<link[^>]+rel="canonical"[^>]+href="([^"]+)"/);
+    if (canonicalMatch?.[1] && !canonicalMatch[1].includes("news.google.com")) {
+      return canonicalMatch[1];
     }
+
+    // Look for meta refresh
+    const metaRefresh = html.match(/<meta[^>]+http-equiv="refresh"[^>]+content="[^"]*url=([^"'\s>]+)/i);
+    if (metaRefresh?.[1] && !metaRefresh[1].includes("news.google.com")) {
+      return metaRefresh[1];
+    }
+
+    // Look for article URL in a[href] pointing to external site
+    const articleLink = html.match(/href="(https?:\/\/(?!news\.google\.com)[^"]+)"/);
+    if (articleLink?.[1]) {
+      return articleLink[1];
+    }
+
     return url;
   } catch {
     return url;
@@ -66,6 +104,7 @@ interface RSSArticle {
   id: string;
   keyword: string;
   url: string;
+  originalUrl: string;
   title: string;
   publishing_agency: string | null;
   published_at: string | null;
@@ -77,7 +116,7 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
 
   try {
     const response = await fetch(rssUrl, {
-      headers: { "User-Agent": "Signal/1.0" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; Signal/1.0)" },
     });
     if (!response.ok) {
       console.error(`RSS fetch failed for "${keyword}" (${edition}:${lang}): ${response.status}`);
@@ -92,16 +131,20 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
     while ((match = itemRegex.exec(xml)) !== null) {
       const itemXml = match[1];
       const title = itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || "";
-      const link = itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() || 
+      const link = itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ||
                    itemXml.match(/<link\s*\/>([\s\S]*?)(?=<)/)?.[1]?.trim() || "";
       const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || null;
       const source = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || null;
+      
+      // Try to extract the source URL from <source url="..."> attribute
+      const sourceUrl = itemXml.match(/<source[^>]+url="([^"]+)"/)?.[1] || null;
 
       if (title && link) {
         articles.push({
           id: sha256(link),
           keyword,
-          url: link, // Will be resolved later
+          url: link,
+          originalUrl: link,
           title,
           publishing_agency: source,
           published_at: pubDate ? new Date(pubDate).toISOString() : null,
@@ -116,30 +159,47 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
   }
 }
 
-function deduplicateArticles(articles: RSSArticle[]): RSSArticle[] {
+function deduplicateArticles(articles: RSSArticle[]): { deduped: RSSArticle[]; removed: number } {
   const seen = new Map<string, RSSArticle>();
   const seenTitles = new Set<string>();
   const seenSlugs = new Set<string>();
   const seenAgencyTime = new Set<string>();
+  const seenContentWords: Array<{ words: Set<string>; article: RSSArticle }> = [];
 
   for (const article of articles) {
     if (seen.has(article.url)) continue;
+    
     const normTitle = normalizeTitle(article.title);
     if (seenTitles.has(normTitle)) continue;
+    
     if (article.publishing_agency && article.published_at) {
       const key = `${article.publishing_agency}|${article.published_at}`;
       if (seenAgencyTime.has(key)) continue;
       seenAgencyTime.add(key);
     }
+    
     const slug = getUrlSlug(article.url);
     if (seenSlugs.has(slug)) continue;
+
+    // Fuzzy title similarity check — catch same content with different URLs
+    const words = getContentWords(article.title);
+    let isDuplicate = false;
+    for (const existing of seenContentWords) {
+      if (titleSimilarity(words, existing.words) >= 0.8) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    if (isDuplicate) continue;
 
     seen.set(article.url, article);
     seenTitles.add(normTitle);
     seenSlugs.add(slug);
+    seenContentWords.push({ words, article });
   }
 
-  return Array.from(seen.values());
+  const deduped = Array.from(seen.values());
+  return { deduped, removed: articles.length - deduped.length };
 }
 
 serve(async (req) => {
@@ -148,7 +208,7 @@ serve(async (req) => {
   }
 
   try {
-    const { keywords } = await req.json();
+    const { keywords, filterDays = 30 } = await req.json();
     if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
       return new Response(JSON.stringify({ error: "keywords array required" }), {
         status: 400,
@@ -159,6 +219,20 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check last run for these keywords
+    const { data: lastRuns } = await supabase
+      .from("collection_runs")
+      .select("id, keywords, completed_at, articles_stored, articles_collected")
+      .eq("status", "completed")
+      .order("completed_at", { ascending: false })
+      .limit(10);
+
+    const matchingLastRun = lastRuns?.find(r => {
+      const sorted1 = [...keywords].sort().join(",");
+      const sorted2 = [...(r.keywords || [])].sort().join(",");
+      return sorted1 === sorted2;
+    });
 
     const batchId = `batch_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15)}`;
     const editions = [
@@ -183,14 +257,14 @@ serve(async (req) => {
 
     const totalCollected = allArticles.length;
 
-    // Deduplicate
-    const deduped = deduplicateArticles(allArticles);
+    // Deduplicate (now includes fuzzy title matching)
+    const { deduped, removed: dedupRemoved } = deduplicateArticles(allArticles);
     const afterDedup = deduped.length;
 
-    // Filter to last 30 days
-    const filterDays = 30;
+    // Filter by user-specified date range
+    const days = Math.max(1, Math.min(365, Number(filterDays) || 30));
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - filterDays);
+    cutoff.setDate(cutoff.getDate() - days);
     const filtered = deduped.filter((a) => {
       if (!a.published_at) return true;
       return new Date(a.published_at) >= cutoff;
@@ -207,16 +281,15 @@ serve(async (req) => {
       const resolved = await Promise.all(
         chunk.map(async (a) => {
           const realUrl = await resolveGoogleNewsUrl(a.url);
-          return { ...a, url: realUrl, id: sha256(realUrl) };
+          return { ...a, url: realUrl, originalUrl: a.url, id: sha256(realUrl) };
         })
       );
       resolvedArticles.push(...resolved);
     }
 
-    // Also resolve URLs for allFetched (for table display) — resolve first 50 for performance
+    // Also resolve URLs for allFetched (for table display) — resolve first 200 for performance
     const allFetchedResolved = await Promise.all(
       allArticles.slice(0, 200).map(async (a) => {
-        // Only resolve for display, don't block too long
         const realUrl = await resolveGoogleNewsUrl(a.url);
         return { ...a, url: realUrl };
       })
@@ -273,7 +346,14 @@ serve(async (req) => {
           completed_at: new Date().toISOString(),
           status: "completed",
         },
-        articles: resolvedArticles,
+        articles: resolvedArticles.map(a => ({
+          id: a.id,
+          title: a.title,
+          url: a.url,
+          keyword: a.keyword,
+          publishing_agency: a.publishing_agency,
+          published_at: a.published_at,
+        })),
         allFetched: allFetchedResolved.map(a => ({
           id: a.id,
           title: a.title,
@@ -291,6 +371,12 @@ serve(async (req) => {
           droppedByDateFilter: afterDedup - afterDateFilter,
           droppedByCap: Math.max(0, afterDateFilter - 20),
         },
+        lastRunForKeywords: matchingLastRun ? {
+          id: matchingLastRun.id,
+          completedAt: matchingLastRun.completed_at,
+          articlesStored: matchingLastRun.articles_stored,
+          articlesCollected: matchingLastRun.articles_collected,
+        } : null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

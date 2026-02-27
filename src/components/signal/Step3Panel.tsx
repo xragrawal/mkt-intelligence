@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { Sparkles, Loader2, Trash2, CheckCircle2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, Copy, ChevronDown, ChevronUp } from "lucide-react";
+import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { ScoredArticle, OpportunityPack, LeadStatus } from "@/lib/types";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +19,8 @@ interface EnrichedResult {
   pack: OpportunityPack;
   dbId?: string;
   status: LeadStatus;
+  createdAt?: string;
+  articleSource?: string | null;
 }
 
 const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
@@ -50,8 +51,10 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
         const loaded: EnrichedResult[] = data.map((row) => ({
           articleUrl: row.article_url,
           articleTitle: row.article_title,
+          articleSource: row.article_source,
           dbId: row.id,
           status: (row.status as LeadStatus) || "open",
+          createdAt: row.created_at,
           pack: {
             companyProfile: {
               companyName: row.company_name || "Unknown",
@@ -94,7 +97,6 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
         const sa = selectedArticles[i];
         setCurrentIndex(i + 1);
 
-        // Check if already exists by URL
         const existingIdx = results.findIndex((r) => r.articleUrl === sa.article.url);
         if (existingIdx !== -1) {
           toast.info(`Skipping "${sa.article.title}" — already analysed`);
@@ -119,11 +121,12 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
           const newResult: EnrichedResult = {
             articleUrl: sa.article.url,
             articleTitle: sa.article.title,
+            articleSource: sa.article.publishing_agency,
             pack: data.pack,
             dbId: data.dbId,
             status: "open",
+            createdAt: new Date().toISOString(),
           };
-          // Stream 1 by 1: update results immediately
           setResults((prev) => [newResult, ...prev]);
           toast.success(`Analysed: ${data.pack.companyProfile.companyName}`);
         }
@@ -194,24 +197,22 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
         )}
 
         {results.length > 0 && (
-          <>
-            <div className="flex items-center gap-1 ml-auto">
-              <button
-                onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                title="Table view"
-              >
-                <LayoutList className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode("detail")}
-                className={`p-1.5 rounded-md transition-colors ${viewMode === "detail" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                title="Detail view"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-            </div>
-          </>
+          <div className="flex items-center gap-1 ml-auto">
+            <button
+              onClick={() => setViewMode("table")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              title="Table view"
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode("detail")}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "detail" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              title="Detail view"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -253,26 +254,26 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
 
       {/* TABLE VIEW */}
       {filteredResults.length > 0 && viewMode === "table" && (
-        <div className="overflow-x-auto -mx-6 px-6">
-          <table className="w-full text-xs border-collapse min-w-0">
+        <div className="space-y-2">
+          <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Company</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
-                <th className="py-2 pr-2 font-medium w-16 text-center">Score</th>
-                <th className="py-2 pr-2 font-medium w-20">Region</th>
+                <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
                 <th className="py-2 pr-2 font-medium w-20">Status</th>
-                <th className="py-2 font-medium w-48 text-right">Actions</th>
+                <th className="py-2 pr-2 font-medium w-20">Date</th>
+                <th className="py-2 font-medium w-44 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredResults.map((r, i) => (
                 <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
                   <td className="py-2.5 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
-                  <td className="py-2.5 pr-2 font-medium text-foreground">
-                    <div className="line-clamp-1">{r.pack.companyProfile.companyName}</div>
-                    <div className="text-[10px] text-muted-foreground">{r.pack.companyProfile.inferredIndustry}</div>
+                  <td className="py-2.5 pr-2">
+                    <div className="font-medium text-foreground line-clamp-1">{r.pack.companyProfile.companyName}</div>
+                    <div className="text-muted-foreground">{r.pack.companyProfile.deploymentRegion}</div>
                   </td>
                   <td className="py-2.5 pr-2">
                     <a
@@ -281,18 +282,20 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
                       rel="noopener noreferrer"
                       className="text-foreground hover:text-primary hover:underline line-clamp-1 inline-flex items-center gap-1"
                     >
-                      <span className="truncate max-w-[200px]">{r.articleTitle}</span>
+                      <span className="truncate max-w-[250px]">{r.articleTitle}</span>
                       <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
                     </a>
                   </td>
                   <td className="py-2.5 pr-2 text-center">
                     <span className="font-display font-bold text-primary">{r.pack.bdOpportunityAssessment.opportunityScore}</span>
                   </td>
-                  <td className="py-2.5 pr-2 text-muted-foreground truncate">{r.pack.companyProfile.deploymentRegion}</td>
                   <td className="py-2.5 pr-2">
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>
                       {LEAD_STATUS_LABELS[r.status]}
                     </span>
+                  </td>
+                  <td className="py-2.5 pr-2 text-muted-foreground tabular-nums whitespace-nowrap">
+                    {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
                   </td>
                   <td className="py-2.5 text-right">
                     <div className="flex items-center gap-0.5 justify-end">
@@ -311,23 +314,15 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
                           Dup
                         </Button>
                       )}
-                      {r.status !== "closed" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "closed")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-foreground" title="Close">
-                          <XCircle className="w-3 h-3" />
-                        </Button>
-                      )}
-                      {r.status !== "archived" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "archived")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-foreground" title="Archive">
-                          <Archive className="w-3 h-3" />
-                        </Button>
-                      )}
                       <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Delete">
                         <Trash2 className="w-3 h-3" />
                       </Button>
-                      {/* Expand detail inline */}
-                      <Button variant="ghost" size="sm" onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-foreground" title="Expand detail">
-                        {expandedDetailId === r.dbId ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      </Button>
+                      <button
+                        onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)}
+                        className="p-1 text-muted-foreground hover:text-foreground"
+                      >
+                        {expandedDetailId === r.dbId ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -335,7 +330,7 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
             </tbody>
           </table>
 
-          {/* Expanded detail below table row */}
+          {/* Expanded detail below table */}
           {expandedDetailId && (() => {
             const r = filteredResults.find((r) => r.dbId === expandedDetailId);
             if (!r) return null;
@@ -350,53 +345,40 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
 
       {/* DETAIL VIEW */}
       {filteredResults.length > 0 && viewMode === "detail" && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-            <span>{filteredResults.length} opportunity packs</span>
-          </div>
-          <div className="space-y-6">
-            {filteredResults.map((r) => (
-              <div key={r.dbId || r.articleUrl} className="relative">
-                <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} pack={r.pack} />
-                <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border bg-muted/20 rounded-b-xl flex-wrap">
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${LEAD_STATUS_COLORS[r.status]}`}>
-                    {LEAD_STATUS_LABELS[r.status]}
-                  </span>
-                  <div className="flex items-center gap-1 ml-auto flex-wrap">
-                    {r.status !== "acted_internally" && (
-                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                        <Briefcase className="w-3.5 h-3.5" /> Add to CRM
-                      </Button>
-                    )}
-                    {r.status !== "shared_with_partners" && (
-                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                        <Users className="w-3.5 h-3.5" /> Share with Partner
-                      </Button>
-                    )}
-                    {r.status !== "duplicate" && (
-                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
-                        Mark Duplicate
-                      </Button>
-                    )}
-                    {r.status !== "closed" && (
-                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "closed")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                        <XCircle className="w-3.5 h-3.5" /> Close
-                      </Button>
-                    )}
-                    {r.status !== "archived" && (
-                      <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "archived")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                        <Archive className="w-3.5 h-3.5" /> Archive
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="w-4 h-4" />
+        <div className="space-y-6">
+          {filteredResults.map((r) => (
+            <div key={r.dbId || r.articleUrl} className="relative">
+              <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} pack={r.pack} />
+              <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border bg-muted/20 rounded-b-xl flex-wrap">
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${LEAD_STATUS_COLORS[r.status]}`}>
+                  {LEAD_STATUS_LABELS[r.status]}
+                </span>
+                {r.createdAt && (
+                  <span className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</span>
+                )}
+                <div className="flex items-center gap-1 ml-auto flex-wrap">
+                  {r.status !== "acted_internally" && (
+                    <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
+                      <Briefcase className="w-3.5 h-3.5" /> Add to CRM
                     </Button>
-                  </div>
+                  )}
+                  {r.status !== "shared_with_partners" && (
+                    <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
+                      <Users className="w-3.5 h-3.5" /> Share with Partner
+                    </Button>
+                  )}
+                  {r.status !== "duplicate" && (
+                    <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
+                      Mark Duplicate
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-muted-foreground hover:text-destructive">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
