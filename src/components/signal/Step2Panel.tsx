@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
-import { Search, Loader2, Filter, AlertTriangle, Database, Eye } from "lucide-react";
+import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
 import { SIGNAL_LABELS } from "@/lib/types";
@@ -47,6 +48,8 @@ export function Step2Panel({
   const [errors, setErrors] = useState<string[]>([]);
   const [droppedArticles, setDroppedArticles] = useState<DroppedArticle[]>([]);
   const [showDropped, setShowDropped] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "detail">("table");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const toggleSelect = useCallback(
     (article: ScoredArticle) => {
@@ -179,6 +182,17 @@ export function Step2Panel({
         )}
       </div>
 
+      {/* Batch context */}
+      {collectionRun && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-mono">{collectionRun.id}</span>
+          <span>•</span>
+          <span>{new Date(collectionRun.started_at).toLocaleString()}</span>
+          <span>•</span>
+          <span>{collectionRun.keywords.join(", ")}</span>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={handleScore} disabled={isScoring || disabled || articlesToScore === 0} className="gap-2">
           {isScoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -189,7 +203,7 @@ export function Step2Panel({
 
         {scoredArticles.length > 0 && (
           <>
-            <div className="flex items-center gap-1.5 ml-auto">
+            <div className="flex items-center gap-1.5">
               <Filter className="w-4 h-4 text-muted-foreground" />
               <select
                 value={filterType || ""}
@@ -210,6 +224,23 @@ export function Step2Panel({
               <option value="score">Sort by Impact</option>
               <option value="date">Sort by Date</option>
             </select>
+
+            <div className="flex items-center gap-1 ml-auto">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "table" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                title="Table view"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("detail")}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === "detail" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                title="Detail view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -295,7 +326,102 @@ export function Step2Panel({
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {/* TABLE VIEW */}
+      {filtered.length > 0 && viewMode === "table" && (
+        <div className="space-y-2">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-border text-left text-muted-foreground">
+                <th className="py-2 pr-2 font-medium w-8"></th>
+                <th className="py-2 pr-2 font-medium w-8">#</th>
+                <th className="py-2 pr-2 font-medium">Article</th>
+                <th className="py-2 pr-2 font-medium w-24">Company</th>
+                <th className="py-2 pr-2 font-medium w-20">Signal</th>
+                <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
+                <th className="py-2 pr-2 font-medium w-16">Confidence</th>
+                <th className="py-2 font-medium w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((sa, i) => {
+                const isSelected = !!selectedArticles.find((s) => s.article.id === sa.article.id);
+                return (
+                  <tr
+                    key={sa.article.id}
+                    className={`border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group ${isSelected ? "bg-primary/5" : ""}`}
+                    onClick={() => toggleSelect(sa)}
+                  >
+                    <td className="py-2.5 pr-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {}}
+                        className="accent-primary"
+                      />
+                    </td>
+                    <td className="py-2.5 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
+                    <td className="py-2.5 pr-2">
+                      <div className="line-clamp-1 text-foreground">{sa.article.title}</div>
+                      <div className="flex items-center gap-2 text-muted-foreground mt-0.5">
+                        <span>{sa.article.publishing_agency || "—"}</span>
+                        {sa.article.published_at && (
+                          <span>{new Date(sa.article.published_at).toLocaleDateString()}</span>
+                        )}
+                        <a
+                          href={sa.article.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="opacity-0 group-hover:opacity-100 text-primary hover:underline inline-flex items-center gap-0.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Open <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </td>
+                    <td className="py-2.5 pr-2 text-foreground font-medium truncate">{sa.scan.company || "—"}</td>
+                    <td className="py-2.5 pr-2">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">
+                        {SIGNAL_LABELS[sa.scan.buyingIntentType]}
+                      </Badge>
+                    </td>
+                    <td className="py-2.5 pr-2 text-center">
+                      <span className="font-display font-bold text-primary tabular-nums">{sa.scan.bdImpactScore}</span>
+                    </td>
+                    <td className="py-2.5 pr-2 text-xs">{sa.scan.confidence}</td>
+                    <td className="py-2.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedId(expandedId === sa.article.id ? null : sa.article.id); }}
+                        className="text-muted-foreground hover:text-foreground p-1"
+                      >
+                        {expandedId === sa.article.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Expanded detail below table */}
+          {expandedId && (() => {
+            const sa = filtered.find((s) => s.article.id === expandedId);
+            if (!sa) return null;
+            return (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-xs">
+                <p className="text-foreground">{sa.scan.whyItMatters}</p>
+                <div className="flex flex-wrap gap-3 text-muted-foreground">
+                  {sa.scan.country && <span>📍 {[sa.scan.city, sa.scan.country].filter(Boolean).join(", ")}</span>}
+                  {sa.scan.unitsMentioned && <span>📦 {sa.scan.unitsMentioned} units</span>}
+                  {sa.scan.partnerOrSI && <span>🤝 {sa.scan.partnerOrSI}</span>}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* DETAIL VIEW (card-based, same as before) */}
+      {filtered.length > 0 && viewMode === "detail" && (
         <div className="grid gap-3">
           {filtered.map((sa) => (
             <ArticleCard

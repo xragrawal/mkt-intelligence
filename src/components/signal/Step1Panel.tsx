@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -13,14 +13,23 @@ interface Step1PanelProps {
   lastRun: CollectionRunSummary | null;
 }
 
+interface LastRunInfo {
+  id: string;
+  completedAt: string;
+  articlesStored: number;
+  articlesCollected: number;
+}
+
 export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [keywords, setKeywords] = useState<string[]>(DEFAULT_KEYWORDS);
   const [inputValue, setInputValue] = useState("");
+  const [filterDays, setFilterDays] = useState(30);
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<CollectedArticle[]>([]);
   const [allFetched, setAllFetched] = useState<FetchedArticleSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineBreakdown | null>(null);
+  const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
@@ -44,10 +53,11 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
     setStoredArticles([]);
     setAllFetched([]);
     setPipeline(null);
+    setLastRunInfo(null);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke("collect-news", {
-        body: { keywords },
+        body: { keywords, filterDays },
       });
 
       if (fnError) throw new Error(fnError.message);
@@ -57,6 +67,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
       if (data.articles) setStoredArticles(data.articles);
       if (data.allFetched) setAllFetched(data.allFetched);
       if (data.pipeline) setPipeline(data.pipeline);
+      if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
       toast.success(`Stored ${data.run.articles_stored} articles (${data.run.articles_collected} fetched)`);
     } catch (e: any) {
       setError(e.message);
@@ -103,6 +114,38 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         </div>
       </div>
 
+      {/* Date range selector */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm text-muted-foreground">Collect articles from last</label>
+          <select
+            value={filterDays}
+            onChange={(e) => setFilterDays(Number(e.target.value))}
+            className="bg-muted border border-border rounded-md px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value={7}>7 days</option>
+            <option value={14}>14 days</option>
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+          </select>
+        </div>
+
+        {/* Last run intelligence */}
+        {lastRunInfo && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5">
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <span>Last run with same keywords:</span>
+            <span className="text-foreground font-medium">
+              {new Date(lastRunInfo.completedAt).toLocaleDateString()} {new Date(lastRunInfo.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <span>•</span>
+            <span>{lastRunInfo.articlesStored} stored / {lastRunInfo.articlesCollected} fetched</span>
+          </div>
+        )}
+      </div>
+
       {/* Action */}
       <div className="flex items-center gap-4">
         <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0} className="gap-2">
@@ -126,13 +169,15 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
               <span className="text-foreground capitalize font-medium">{lastRun.status}</span>
               <span>•</span>
               <span className="font-mono truncate">{lastRun.id}</span>
+              <span>•</span>
+              <span>{new Date(lastRun.started_at).toLocaleString()}</span>
             </div>
 
             <div className="space-y-1.5">
               <PipelineRow label="Fetched from RSS" value={pipeline.totalFetched} />
-              <PipelineArrow dropped={pipeline.droppedByDedup} reason="duplicates removed" />
+              <PipelineArrow dropped={pipeline.droppedByDedup} reason="duplicates removed (URL + fuzzy title)" />
               <PipelineRow label="After dedup" value={pipeline.afterDedup} />
-              <PipelineArrow dropped={pipeline.droppedByDateFilter} reason="older than 30 days" />
+              <PipelineArrow dropped={pipeline.droppedByDateFilter} reason={`older than ${filterDays} days`} />
               <PipelineRow label="After date filter" value={pipeline.afterDateFilter} />
               {pipeline.droppedByCap > 0 && (
                 <PipelineArrow dropped={pipeline.droppedByCap} reason="capped at 20 for MVP" />
@@ -142,7 +187,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
 
             {lastRun.articles_stored === 0 && (
               <p className="text-xs text-destructive/80 bg-destructive/10 rounded-md px-3 py-2">
-                No articles passed the pipeline. Try different keywords or check if Google News has fresh results.
+                No articles passed the pipeline. Try different keywords or a wider date range.
               </p>
             )}
           </div>
@@ -171,7 +216,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
 function PipelineRow({ label, value, variant }: { label: string; value: number; variant?: "highlight" }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground text-xs w-40">{label}</span>
+      <span className="text-muted-foreground text-xs w-48">{label}</span>
       <span className={`font-display font-bold tabular-nums ${variant === "highlight" ? "text-primary" : "text-foreground"}`}>
         {value}
       </span>
