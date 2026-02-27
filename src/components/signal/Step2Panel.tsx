@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Search, Loader2, Filter } from "lucide-react";
+import { Search, Loader2, Filter, AlertTriangle, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArticleCard } from "@/components/signal/ArticleCard";
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
@@ -19,6 +19,13 @@ const ALL_INTENT_TYPES: BuyingIntentType[] = [
   "EXPANSION", "FUNDING", "REGULATION", "OTHER",
 ];
 
+interface ScoringStats {
+  fromCache?: number;
+  preFiltered?: number;
+  totalScored?: number;
+  totalRelevant?: number;
+}
+
 export function Step2Panel({
   collectionRun,
   scoredArticles,
@@ -27,10 +34,11 @@ export function Step2Panel({
   onSelectionChange,
 }: Step2PanelProps) {
   const [isScoring, setIsScoring] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [filterType, setFilterType] = useState<BuyingIntentType | null>(null);
   const [sortBy, setSortBy] = useState<"score" | "date">("score");
-  const [stats, setStats] = useState<{ fromCache?: number; preFiltered?: number } | null>(null);
+  const [stats, setStats] = useState<ScoringStats | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
 
   const toggleSelect = useCallback(
     (article: ScoredArticle) => {
@@ -47,8 +55,9 @@ export function Step2Panel({
   const handleScore = async () => {
     if (!collectionRun) return;
     setIsScoring(true);
-    setProgress(0);
+    setProgress({ current: 0, total: collectionRun.articles_stored });
     setStats(null);
+    setErrors([]);
     const results: ScoredArticle[] = [];
 
     try {
@@ -90,16 +99,21 @@ export function Step2Panel({
           try {
             const parsed = JSON.parse(jsonStr);
             if (parsed.type === "progress") {
-              setProgress(parsed.current);
+              setProgress({ current: parsed.current, total: parsed.total });
             } else if (parsed.type === "progress_note") {
               console.log("Optimization:", parsed.message);
             } else if (parsed.type === "result") {
               results.push(parsed.data);
               onArticlesScored([...results]);
             } else if (parsed.type === "complete") {
-              setStats({ fromCache: parsed.fromCache, preFiltered: parsed.preFiltered });
+              setStats({
+                fromCache: parsed.fromCache,
+                preFiltered: parsed.preFiltered,
+                totalScored: parsed.totalScored,
+                totalRelevant: parsed.totalRelevant,
+              });
             } else if (parsed.type === "error") {
-              console.warn("Scoring error for article:", parsed.message);
+              setErrors((prev) => [...prev, parsed.message]);
             }
           } catch {
             buffer = line + "\n" + buffer;
@@ -109,7 +123,11 @@ export function Step2Panel({
       }
 
       onArticlesScored(results);
-      toast.success(`Scored ${results.length} relevant signals`);
+      if (results.length > 0) {
+        toast.success(`Found ${results.length} relevant signals`);
+      } else {
+        toast.info("No relevant signals found in this batch");
+      }
     } catch (e: any) {
       toast.error("Scoring failed: " + e.message);
     } finally {
@@ -126,6 +144,7 @@ export function Step2Panel({
     );
 
   const disabled = !collectionRun;
+  const articlesToScore = collectionRun?.articles_stored || 0;
 
   return (
     <section className={`rounded-xl border border-border bg-card p-6 space-y-5 animate-slide-up ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
@@ -136,25 +155,23 @@ export function Step2Panel({
           </div>
           <div>
             <h2 className="text-lg font-display font-semibold text-foreground">Relevant Signals</h2>
-            <p className="text-sm text-muted-foreground">AI-scored articles ranked by opportunity impact</p>
+            <p className="text-sm text-muted-foreground">
+              AI-scored articles ranked by opportunity impact
+              {articlesToScore > 0 && !isScoring && scoredArticles.length === 0 && (
+                <span className="text-foreground"> • {articlesToScore} articles ready to score</span>
+              )}
+            </p>
           </div>
         </div>
         {scoredArticles.length > 0 && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
-            {stats && (stats.fromCache || stats.preFiltered) ? (
-              <span className="text-xs text-muted-foreground/70">
-                ({stats.fromCache ? `${stats.fromCache} cached` : ""}{stats.fromCache && stats.preFiltered ? ", " : ""}{stats.preFiltered ? `${stats.preFiltered} pre-filtered` : ""})
-              </span>
-            ) : null}
-          </div>
+          <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={handleScore}
-          disabled={isScoring || disabled}
+          disabled={isScoring || disabled || articlesToScore === 0}
           className="gap-2"
         >
           {isScoring ? (
@@ -162,7 +179,9 @@ export function Step2Panel({
           ) : (
             <Search className="w-4 h-4" />
           )}
-          {isScoring ? `Scoring… (${progress})` : "Find Relevant Signals"}
+          {isScoring
+            ? `Scoring… (${progress.current}/${progress.total})`
+            : `Score ${articlesToScore} Articles`}
         </Button>
 
         {scoredArticles.length > 0 && (
@@ -191,6 +210,55 @@ export function Step2Panel({
           </>
         )}
       </div>
+
+      {/* Scoring stats summary */}
+      {stats && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs rounded-lg bg-muted/50 border border-border px-4 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <Database className="w-3 h-3 text-muted-foreground" />
+            <span className="text-muted-foreground">Processed</span>
+            <span className="text-foreground font-medium">{stats.totalScored}</span>
+          </div>
+          {(stats.fromCache ?? 0) > 0 && (
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground">Cached</span>
+              <span className="text-primary font-medium">{stats.fromCache}</span>
+            </div>
+          )}
+          {(stats.preFiltered ?? 0) > 0 && (
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground">Pre-filtered</span>
+              <span className="text-muted-foreground font-medium">{stats.preFiltered}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">Relevant</span>
+            <span className="text-primary font-bold">{stats.totalRelevant}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Errors */}
+      {errors.length > 0 && (
+        <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5 space-y-1">
+          {errors.map((err, i) => (
+            <p key={i} className="text-xs text-destructive flex items-center gap-1.5">
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+              {err}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* No results message */}
+      {!isScoring && stats && scoredArticles.length === 0 && (
+        <div className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center space-y-2">
+          <p className="text-sm text-muted-foreground">No relevant signals found in this batch.</p>
+          <p className="text-xs text-muted-foreground/70">
+            All {stats.totalScored} articles were scored below the relevance threshold. Try collecting with different keywords.
+          </p>
+        </div>
+      )}
 
       {filtered.length > 0 && (
         <div className="grid gap-3">

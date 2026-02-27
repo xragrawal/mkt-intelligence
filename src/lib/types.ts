@@ -70,6 +70,10 @@ export interface CollectionRunSummary {
   keywords: string[];
   articles_collected: number;
   articles_stored: number;
+  after_dedup?: number;
+  after_date_filter?: number;
+  duplicates_removed?: number;
+  date_filtered?: number;
   started_at: string;
   completed_at: string | null;
   status: string;
