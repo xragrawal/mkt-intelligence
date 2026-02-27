@@ -86,7 +86,7 @@ const BATCH_SCORING_TOOL = {
 };
 
 const BATCH_SIZE = 5;
-const MIN_BD_SCORE = 50;
+const MIN_BD_SCORE = 30;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -185,6 +185,7 @@ serve(async (req) => {
               why_it_matters: "Pre-filtered: " + dropReason,
               confidence: "HIGH",
             }, { onConflict: "article_id" });
+            send({ type: "dropped", title: a.title, reason: `Pre-filter: ${dropReason}` });
           } else {
             toScore.push(a);
           }
@@ -252,6 +253,8 @@ serve(async (req) => {
               if (scan.isRelevant) {
                 results.push({ article, scan });
                 send({ type: "result", data: { article, scan } });
+              } else {
+                send({ type: "dropped", title: article.title, reason: scan.dropReason || "Scored as not relevant", score: scan.bdImpactScore });
               }
             }
 

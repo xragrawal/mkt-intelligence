@@ -95,11 +95,14 @@ export type Database = {
           inferred_industry: string | null
           likely_buyer_type: string | null
           maturity_signal: string | null
+          notes: string | null
           opportunity_score: number | null
           partnership_angle: string | null
           raw_json: Json | null
           risk_factors: string | null
           scale_description: string | null
+          status: string
+          status_updated_at: string | null
           strategic_entry_point: string | null
           urgency_level: string | null
           why_this_is_hot: string | null
@@ -118,11 +121,14 @@ export type Database = {
           inferred_industry?: string | null
           likely_buyer_type?: string | null
           maturity_signal?: string | null
+          notes?: string | null
           opportunity_score?: number | null
           partnership_angle?: string | null
           raw_json?: Json | null
           risk_factors?: string | null
           scale_description?: string | null
+          status?: string
+          status_updated_at?: string | null
           strategic_entry_point?: string | null
           urgency_level?: string | null
           why_this_is_hot?: string | null
@@ -141,11 +147,14 @@ export type Database = {
           inferred_industry?: string | null
           likely_buyer_type?: string | null
           maturity_signal?: string | null
+          notes?: string | null
           opportunity_score?: number | null
           partnership_angle?: string | null
           raw_json?: Json | null
           risk_factors?: string | null
           scale_description?: string | null
+          status?: string
+          status_updated_at?: string | null
           strategic_entry_point?: string | null
           urgency_level?: string | null
           why_this_is_hot?: string | null
