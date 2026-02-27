@@ -6,9 +6,23 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SCORING_PROMPT = `You are a Business Development intelligence analyst for FlytBase, a drone technology company. Your job is to score news articles for commercial opportunity relevance.
+// ── Pre-filter: skip obviously irrelevant titles before burning tokens ──
+const DROP_KEYWORDS = [
+  "opinion:", "editorial:", "review:", "stock price", "share price",
+  "market cap", "analyst rating", "buy/sell", "etf", "index fund",
+  "podcast", "webinar replay", "infographic",
+];
 
-Given an article title, source, and URL, evaluate it for BD relevance and produce a structured assessment.
+function shouldPreFilter(title: string): string | null {
+  const lower = title.toLowerCase();
+  for (const kw of DROP_KEYWORDS) {
+    if (lower.includes(kw)) return `Title contains "${kw}"`;
+  }
+  return null;
+}
+
+// ── Prompt for batch scoring ──
+const SCORING_PROMPT = `You are a Business Development intelligence analyst for FlytBase, a drone technology company. Score news articles for commercial opportunity relevance.
 
 SCORING RULES:
 - buyingIntentScore (0-50): How strong is the buying/deployment signal?
@@ -23,42 +37,55 @@ DROP these (isRelevant=false):
 - Stock-only or financial commentary articles
 
 BUYING INTENT TYPES: LIVE_DEPLOYMENT, CONTRACT_AWARD, TENDER, PARTNER_ANNOUNCEMENT, EXPANSION, FUNDING, REGULATION, OTHER
+CONFIDENCE: HIGH, MEDIUM, LOW
 
-CONFIDENCE: HIGH (strong direct evidence), MEDIUM (inferred from context), LOW (speculative)
+You will receive MULTIPLE articles at once. Score each one independently.`;
 
-Output JSON matching this exact schema. No markdown, just raw JSON.`;
-
-const SCORING_TOOL = {
+const BATCH_SCORING_TOOL = {
   type: "function" as const,
   function: {
-    name: "score_article",
-    description: "Score a news article for business development relevance",
+    name: "score_articles_batch",
+    description: "Score multiple news articles for BD relevance in one call",
     parameters: {
       type: "object",
       properties: {
-        isRelevant: { type: "boolean" },
-        dropReason: { type: ["string", "null"] },
-        company: { type: ["string", "null"] },
-        partnerOrSI: { type: ["string", "null"] },
-        country: { type: ["string", "null"] },
-        city: { type: ["string", "null"] },
-        unitsMentioned: { type: ["number", "null"] },
-        buyingIntentType: {
-          type: "string",
-          enum: ["LIVE_DEPLOYMENT", "CONTRACT_AWARD", "TENDER", "PARTNER_ANNOUNCEMENT", "EXPANSION", "FUNDING", "REGULATION", "OTHER"],
+        scores: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              articleIndex: { type: "number", description: "0-based index of the article in the input list" },
+              isRelevant: { type: "boolean" },
+              dropReason: { type: ["string", "null"] },
+              company: { type: ["string", "null"] },
+              partnerOrSI: { type: ["string", "null"] },
+              country: { type: ["string", "null"] },
+              city: { type: ["string", "null"] },
+              unitsMentioned: { type: ["number", "null"] },
+              buyingIntentType: {
+                type: "string",
+                enum: ["LIVE_DEPLOYMENT", "CONTRACT_AWARD", "TENDER", "PARTNER_ANNOUNCEMENT", "EXPANSION", "FUNDING", "REGULATION", "OTHER"],
+              },
+              leadClarityScore: { type: "number" },
+              buyingIntentScore: { type: "number" },
+              sourceQualityScore: { type: "number" },
+              bdImpactScore: { type: "number" },
+              whyItMatters: { type: "string" },
+              confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+            },
+            required: ["articleIndex", "isRelevant", "buyingIntentType", "leadClarityScore", "buyingIntentScore", "sourceQualityScore", "bdImpactScore", "whyItMatters", "confidence"],
+            additionalProperties: false,
+          },
         },
-        leadClarityScore: { type: "number" },
-        buyingIntentScore: { type: "number" },
-        sourceQualityScore: { type: "number" },
-        bdImpactScore: { type: "number" },
-        whyItMatters: { type: "string" },
-        confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
       },
-      required: ["isRelevant", "buyingIntentType", "leadClarityScore", "buyingIntentScore", "sourceQualityScore", "bdImpactScore", "whyItMatters", "confidence"],
+      required: ["scores"],
       additionalProperties: false,
     },
   },
 };
+
+const BATCH_SIZE = 5;
+const MIN_BD_SCORE = 50;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -96,7 +123,15 @@ serve(async (req) => {
       });
     }
 
-    const MIN_BD_SCORE = 50;
+    // ── Optimization 4: Check cache for already-scored articles ──
+    const articleIds = articles.map((a) => a.id);
+    const { data: cached } = await supabase
+      .from("scored_articles")
+      .select("*")
+      .in("article_id", articleIds);
+
+    const cachedMap = new Map((cached || []).map((c) => [c.article_id, c]));
+    const articleMap = new Map(articles.map((a) => [a.id, a]));
 
     // SSE stream
     const encoder = new TextEncoder();
@@ -108,9 +143,72 @@ serve(async (req) => {
 
         const results: Array<{ article: typeof articles[0]; scan: any }> = [];
 
-        for (let i = 0; i < articles.length; i++) {
-          const article = articles[i];
-          send({ type: "progress", current: i + 1, total: articles.length });
+        // Emit cached results immediately
+        let cachedCount = 0;
+        for (const [articleId, cachedScore] of cachedMap) {
+          const article = articleMap.get(articleId);
+          if (!article || !cachedScore.is_relevant) continue;
+          const scan = {
+            isRelevant: cachedScore.is_relevant,
+            company: cachedScore.company,
+            partnerOrSI: cachedScore.partner_or_si,
+            country: cachedScore.country,
+            city: cachedScore.city,
+            unitsMentioned: cachedScore.units_mentioned,
+            buyingIntentType: cachedScore.buying_intent_type,
+            leadClarityScore: cachedScore.lead_clarity_score,
+            buyingIntentScore: cachedScore.buying_intent_score,
+            sourceQualityScore: cachedScore.source_quality_score,
+            bdImpactScore: cachedScore.bd_impact_score,
+            whyItMatters: cachedScore.why_it_matters,
+            confidence: cachedScore.confidence,
+          };
+          results.push({ article, scan });
+          send({ type: "result", data: { article, scan } });
+          cachedCount++;
+        }
+
+        if (cachedCount > 0) {
+          send({ type: "progress_note", message: `${cachedCount} articles loaded from cache` });
+        }
+
+        // Filter out cached + pre-filtered articles
+        const uncached = articles.filter((a) => !cachedMap.has(a.id));
+        const toScore: typeof articles = [];
+        for (const a of uncached) {
+          const dropReason = shouldPreFilter(a.title);
+          if (dropReason) {
+            // Cache the pre-filtered result too
+            await supabase.from("scored_articles").upsert({
+              article_id: a.id,
+              batch_id: batchId,
+              is_relevant: false,
+              drop_reason: dropReason,
+              buying_intent_type: "OTHER",
+              why_it_matters: "Pre-filtered: " + dropReason,
+              confidence: "HIGH",
+            }, { onConflict: "article_id" });
+          } else {
+            toScore.push(a);
+          }
+        }
+
+        const preFilteredCount = uncached.length - toScore.length;
+        if (preFilteredCount > 0) {
+          send({ type: "progress_note", message: `${preFilteredCount} articles pre-filtered (skipped)` });
+        }
+
+        // ── Batch scoring with cheaper model ──
+        const totalBatches = Math.ceil(toScore.length / BATCH_SIZE);
+        let scored = 0;
+
+        for (let b = 0; b < totalBatches; b++) {
+          const batch = toScore.slice(b * BATCH_SIZE, (b + 1) * BATCH_SIZE);
+          send({ type: "progress", current: scored + cachedCount + preFilteredCount, total: articles.length });
+
+          const articleList = batch
+            .map((a, i) => `[${i}] Title: ${a.title}\n    Source: ${a.publishing_agency || "Unknown"}\n    URL: ${a.url}\n    Published: ${a.published_at || "Unknown"}`)
+            .join("\n\n");
 
           try {
             const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -120,23 +218,20 @@ serve(async (req) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: "google/gemini-3-flash-preview",
+                model: "google/gemini-2.5-flash-lite",
                 messages: [
                   { role: "system", content: SCORING_PROMPT },
-                  {
-                    role: "user",
-                    content: `Score this article:\nTitle: ${article.title}\nSource: ${article.publishing_agency || "Unknown"}\nURL: ${article.url}\nPublished: ${article.published_at || "Unknown"}`,
-                  },
+                  { role: "user", content: `Score these ${batch.length} articles:\n\n${articleList}` },
                 ],
-                tools: [SCORING_TOOL],
-                tool_choice: { type: "function", function: { name: "score_article" } },
+                tools: [BATCH_SCORING_TOOL],
+                tool_choice: { type: "function", function: { name: "score_articles_batch" } },
               }),
             });
 
             if (response.status === 429) {
               send({ type: "error", message: "Rate limited — waiting before retry" });
               await new Promise((r) => setTimeout(r, 5000));
-              i--; // Retry
+              b--; // Retry this batch
               continue;
             }
 
@@ -147,29 +242,60 @@ serve(async (req) => {
 
             if (!response.ok) {
               console.error("LLM error:", response.status, await response.text());
-              send({ type: "error", message: `Scoring failed for: ${article.title}` });
+              send({ type: "error", message: `Batch ${b + 1} scoring failed` });
+              scored += batch.length;
               continue;
             }
 
             const data = await response.json();
             const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
             if (!toolCall) {
-              send({ type: "error", message: `No structured output for: ${article.title}` });
+              send({ type: "error", message: `No structured output for batch ${b + 1}` });
+              scored += batch.length;
               continue;
             }
 
-            const scan = JSON.parse(toolCall.function.arguments);
+            const { scores } = JSON.parse(toolCall.function.arguments);
 
-            if (scan.isRelevant) {
-              results.push({ article, scan });
-              send({ type: "result", data: { article, scan } });
+            // Process each score in the batch
+            for (const scan of scores) {
+              const idx = scan.articleIndex;
+              if (idx < 0 || idx >= batch.length) continue;
+              const article = batch[idx];
+
+              // Cache to DB
+              await supabase.from("scored_articles").upsert({
+                article_id: article.id,
+                batch_id: batchId,
+                is_relevant: scan.isRelevant,
+                drop_reason: scan.dropReason,
+                company: scan.company,
+                partner_or_si: scan.partnerOrSI,
+                country: scan.country,
+                city: scan.city,
+                units_mentioned: scan.unitsMentioned,
+                buying_intent_type: scan.buyingIntentType,
+                lead_clarity_score: scan.leadClarityScore,
+                buying_intent_score: scan.buyingIntentScore,
+                source_quality_score: scan.sourceQualityScore,
+                bd_impact_score: scan.bdImpactScore,
+                why_it_matters: scan.whyItMatters,
+                confidence: scan.confidence,
+              }, { onConflict: "article_id" });
+
+              if (scan.isRelevant) {
+                results.push({ article, scan });
+                send({ type: "result", data: { article, scan } });
+              }
             }
 
-            // Small delay between calls to avoid rate limiting
-            await new Promise((r) => setTimeout(r, 300));
+            scored += batch.length;
+            // Small delay between batches
+            if (b < totalBatches - 1) await new Promise((r) => setTimeout(r, 500));
           } catch (e) {
-            console.error(`Error scoring "${article.title}":`, e);
+            console.error(`Error scoring batch ${b + 1}:`, e);
             send({ type: "error", message: `Error: ${e instanceof Error ? e.message : "Unknown"}` });
+            scored += batch.length;
           }
         }
 
@@ -191,8 +317,6 @@ serve(async (req) => {
         }
 
         let deduped = Array.from(eventMap.values());
-
-        // Apply MIN_BD_SCORE gate with top-3 fallback
         let filtered = deduped.filter((r) => r.scan.bdImpactScore >= MIN_BD_SCORE);
         if (filtered.length === 0) {
           filtered = deduped
@@ -200,7 +324,7 @@ serve(async (req) => {
             .slice(0, 3);
         }
 
-        send({ type: "complete", totalScored: articles.length, totalRelevant: filtered.length });
+        send({ type: "complete", totalScored: articles.length, totalRelevant: filtered.length, fromCache: cachedCount, preFiltered: preFilteredCount });
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },

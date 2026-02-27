@@ -152,6 +152,69 @@ export type Database = {
         }
         Relationships: []
       }
+      scored_articles: {
+        Row: {
+          article_id: string
+          batch_id: string
+          bd_impact_score: number | null
+          buying_intent_score: number | null
+          buying_intent_type: string | null
+          city: string | null
+          company: string | null
+          confidence: string | null
+          country: string | null
+          created_at: string
+          drop_reason: string | null
+          id: string
+          is_relevant: boolean
+          lead_clarity_score: number | null
+          partner_or_si: string | null
+          source_quality_score: number | null
+          units_mentioned: number | null
+          why_it_matters: string | null
+        }
+        Insert: {
+          article_id: string
+          batch_id: string
+          bd_impact_score?: number | null
+          buying_intent_score?: number | null
+          buying_intent_type?: string | null
+          city?: string | null
+          company?: string | null
+          confidence?: string | null
+          country?: string | null
+          created_at?: string
+          drop_reason?: string | null
+          id?: string
+          is_relevant?: boolean
+          lead_clarity_score?: number | null
+          partner_or_si?: string | null
+          source_quality_score?: number | null
+          units_mentioned?: number | null
+          why_it_matters?: string | null
+        }
+        Update: {
+          article_id?: string
+          batch_id?: string
+          bd_impact_score?: number | null
+          buying_intent_score?: number | null
+          buying_intent_type?: string | null
+          city?: string | null
+          company?: string | null
+          confidence?: string | null
+          country?: string | null
+          created_at?: string
+          drop_reason?: string | null
+          id?: string
+          is_relevant?: boolean
+          lead_clarity_score?: number | null
+          partner_or_si?: string | null
+          source_quality_score?: number | null
+          units_mentioned?: number | null
+          why_it_matters?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
