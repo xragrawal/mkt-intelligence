@@ -276,18 +276,18 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
       {/* TABLE VIEW */}
       {filteredResults.length > 0 && viewMode === "table" && (
         <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse min-w-[700px]">
+          <table className="w-full text-xs border-collapse min-w-[750px]">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-1.5 font-medium">#</th>
-                <th className="py-2 pr-1.5 font-medium">Company</th>
-                <th className="py-2 pr-1.5 font-medium">Partner / SI</th>
-                <th className="py-2 pr-1.5 font-medium">Location</th>
-                <th className="py-2 pr-1.5 font-medium">Signal</th>
-                <th className="py-2 pr-1.5 font-medium text-center">Units</th>
-                <th className="py-2 pr-1.5 font-medium">Conf.</th>
-                <th className="py-2 pr-1.5 font-medium">Status</th>
-                <th className="py-2 font-medium text-right">Actions</th>
+                <th className="py-2 px-2 font-medium">#</th>
+                <th className="py-2 px-2 font-medium">Company</th>
+                <th className="py-2 px-2 font-medium">Partner / SI</th>
+                <th className="py-2 px-2 font-medium">Location</th>
+                <th className="py-2 px-2 font-medium">Signal</th>
+                <th className="py-2 px-2 font-medium text-center">Units</th>
+                <th className="py-2 px-2 font-medium">Conf.</th>
+                <th className="py-2 px-2 font-medium">Status</th>
+                <th className="py-2 px-2 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -301,38 +301,44 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
 
                 return (
                   <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
-                    <td className="py-2 pr-1.5 text-muted-foreground tabular-nums">{i + 1}</td>
-                    <td className="py-2 pr-1.5 max-w-[180px]">
-                      <div className="font-medium text-foreground truncate">{r.pack.companyProfile.companyName}</div>
-                      <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline truncate block text-[10px]">
-                        {r.articleTitle}
+                    <td className="py-2 px-2 text-muted-foreground tabular-nums align-top">{i + 1}</td>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
+                      <div className="font-medium text-foreground break-words leading-tight">{r.pack.companyProfile.companyName}</div>
+                      <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline text-[10px] break-words leading-tight inline-flex items-center gap-0.5 mt-0.5">
+                        <span className="line-clamp-2">{r.articleTitle}</span>
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
                       </a>
                     </td>
-                    <td className="py-2 pr-1.5 text-foreground truncate max-w-[100px]">{partner}</td>
-                    <td className="py-2 pr-1.5 text-foreground truncate max-w-[90px]">{location}</td>
-                    <td className="py-2 pr-1.5">
+                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 100 }}>{partner}</td>
+                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
+                    <td className="py-2 px-2 align-top">
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">{intentLabel}</Badge>
                     </td>
-                    <td className="py-2 pr-1.5 text-center tabular-nums text-foreground">{units ?? "—"}</td>
-                    <td className="py-2 pr-1.5">
+                    <td className="py-2 px-2 text-center tabular-nums text-foreground align-top">{units ?? "—"}</td>
+                    <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] font-medium ${confidence === "HIGH" ? "text-primary" : confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>{confidence}</span>
                     </td>
-                    <td className="py-2 pr-1.5">
+                    <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
                     </td>
-                    <td className="py-2 text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-0.5">
+                    <td className="py-2 px-2 text-right align-top">
+                      <div className="flex flex-wrap items-center gap-0.5 justify-end">
                         {r.status !== "acted_internally" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1 text-muted-foreground hover:text-foreground" title="CRM">
-                            <Briefcase className="w-3 h-3" />
+                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
+                            <Briefcase className="w-3 h-3" /> CRM
+                          </Button>
+                        )}
+                        {r.status !== "shared_with_partners" && (
+                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
+                            <Users className="w-3 h-3" /> Partner
                           </Button>
                         )}
                         {r.status !== "duplicate" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1 text-muted-foreground hover:text-destructive" title="Duplicate">
-                            <XCircle className="w-3 h-3" />
+                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
+                            Dup
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1 text-muted-foreground hover:text-destructive" title="Delete">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
                           <Trash2 className="w-3 h-3" />
                         </Button>
                         <button onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)} className="p-1 text-muted-foreground hover:text-foreground">
