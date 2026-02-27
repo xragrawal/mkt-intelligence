@@ -277,32 +277,8 @@ serve(async (req) => {
           }
         }
 
-        // Post-scoring dedup
-        const eventMap = new Map<string, typeof results[0]>();
-        for (const r of results) {
-          const key = [
-            r.scan.company || "",
-            r.scan.partnerOrSI || "",
-            r.scan.buyingIntentType,
-            r.scan.country || "",
-            r.scan.city || "",
-          ].join("|").toLowerCase();
-
-          const existing = eventMap.get(key);
-          if (!existing || r.scan.bdImpactScore > existing.scan.bdImpactScore) {
-            eventMap.set(key, r);
-          }
-        }
-
-        let deduped = Array.from(eventMap.values());
-        let filtered = deduped.filter((r) => r.scan.bdImpactScore >= MIN_BD_SCORE);
-        if (filtered.length === 0) {
-          filtered = deduped
-            .sort((a, b) => b.scan.bdImpactScore - a.scan.bdImpactScore)
-            .slice(0, 3);
-        }
-
-        send({ type: "complete", totalScored: articles.length, totalRelevant: filtered.length, fromCache: cachedCount, preFiltered: preFilteredCount });
+        // Report all results that were already streamed — no post-filtering
+        send({ type: "complete", totalScored: articles.length, totalRelevant: results.length, fromCache: cachedCount, preFiltered: preFilteredCount });
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },

@@ -165,8 +165,8 @@ serve(async (req) => {
     const deduped = deduplicateArticles(allArticles);
     const afterDedup = deduped.length;
 
-    // Filter to last 7 days
-    const filterDays = 7;
+    // Filter to last 30 days
+    const filterDays = 30;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - filterDays);
     const filtered = deduped.filter((a) => {
