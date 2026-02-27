@@ -74,10 +74,48 @@ export interface CollectionRunSummary {
   after_date_filter?: number;
   duplicates_removed?: number;
   date_filtered?: number;
+  capped?: number;
   started_at: string;
   completed_at: string | null;
   status: string;
 }
+
+export interface FetchedArticleSummary {
+  id: string;
+  title: string;
+  url: string;
+  keyword: string;
+  publishing_agency: string | null;
+  published_at: string | null;
+}
+
+export interface PipelineBreakdown {
+  totalFetched: number;
+  afterDedup: number;
+  afterDateFilter: number;
+  afterCap: number;
+  droppedByDedup: number;
+  droppedByDateFilter: number;
+  droppedByCap: number;
+}
+
+export type LeadStatus = "open" | "shared_with_partners" | "acted_internally" | "closed" | "archived";
+
+export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
+  open: "Open",
+  shared_with_partners: "Shared with Partners",
+  acted_internally: "Acted Internally",
+  closed: "Closed",
+  archived: "Archived",
+};
+
+export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
+  open: "bg-primary/15 text-primary",
+  shared_with_partners: "bg-signal-partner/15 text-signal-partner",
+  acted_internally: "bg-signal-expansion/15 text-signal-expansion",
+  closed: "bg-signal-contract/15 text-signal-contract",
+  archived: "bg-muted text-muted-foreground",
+};
 
 export const SIGNAL_COLORS: Record<BuyingIntentType, string> = {
   LIVE_DEPLOYMENT: "signal-deployment",

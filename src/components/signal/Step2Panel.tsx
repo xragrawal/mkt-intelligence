@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Search, Loader2, Filter, AlertTriangle, Database } from "lucide-react";
+import { Search, Loader2, Filter, AlertTriangle, Database, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ArticleCard } from "@/components/signal/ArticleCard";
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
@@ -26,6 +26,12 @@ interface ScoringStats {
   totalRelevant?: number;
 }
 
+interface DroppedArticle {
+  title: string;
+  reason: string;
+  score?: number;
+}
+
 export function Step2Panel({
   collectionRun,
   scoredArticles,
@@ -39,6 +45,8 @@ export function Step2Panel({
   const [sortBy, setSortBy] = useState<"score" | "date">("score");
   const [stats, setStats] = useState<ScoringStats | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [droppedArticles, setDroppedArticles] = useState<DroppedArticle[]>([]);
+  const [showDropped, setShowDropped] = useState(false);
 
   const toggleSelect = useCallback(
     (article: ScoredArticle) => {
@@ -58,7 +66,9 @@ export function Step2Panel({
     setProgress({ current: 0, total: collectionRun.articles_stored });
     setStats(null);
     setErrors([]);
+    setDroppedArticles([]);
     const results: ScoredArticle[] = [];
+    const dropped: DroppedArticle[] = [];
 
     try {
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/score-articles`;
@@ -105,6 +115,9 @@ export function Step2Panel({
             } else if (parsed.type === "result") {
               results.push(parsed.data);
               onArticlesScored([...results]);
+            } else if (parsed.type === "dropped") {
+              dropped.push({ title: parsed.title, reason: parsed.reason, score: parsed.score });
+              setDroppedArticles([...dropped]);
             } else if (parsed.type === "complete") {
               setStats({
                 fromCache: parsed.fromCache,
@@ -150,9 +163,7 @@ export function Step2Panel({
     <section className={`rounded-xl border border-border bg-card p-6 space-y-5 animate-slide-up ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-display font-bold text-primary">
-            2
-          </div>
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-display font-bold text-primary">2</div>
           <div>
             <h2 className="text-lg font-display font-semibold text-foreground">Relevant Signals</h2>
             <p className="text-sm text-muted-foreground">
@@ -169,16 +180,8 @@ export function Step2Panel({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button
-          onClick={handleScore}
-          disabled={isScoring || disabled || articlesToScore === 0}
-          className="gap-2"
-        >
-          {isScoring ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Search className="w-4 h-4" />
-          )}
+        <Button onClick={handleScore} disabled={isScoring || disabled || articlesToScore === 0} className="gap-2">
+          {isScoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
           {isScoring
             ? `Scoring… (${progress.current}/${progress.total})`
             : `Score ${articlesToScore} Articles`}
@@ -238,6 +241,38 @@ export function Step2Panel({
         </div>
       )}
 
+      {/* Dropped articles breakdown */}
+      {droppedArticles.length > 0 && (
+        <div className="rounded-lg bg-muted/30 border border-border">
+          <button
+            onClick={() => setShowDropped(!showDropped)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Eye className="w-3.5 h-3.5" />
+              <span>{droppedArticles.length} articles dropped by AI scoring</span>
+            </div>
+            <span className="text-[10px]">{showDropped ? "Hide" : "Show reasons"}</span>
+          </button>
+          {showDropped && (
+            <div className="px-4 pb-3 space-y-1.5 max-h-48 overflow-y-auto">
+              {droppedArticles.map((d, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className="text-destructive/60 shrink-0 mt-0.5">✕</span>
+                  <div className="min-w-0">
+                    <p className="text-foreground/70 line-clamp-1">{d.title}</p>
+                    <p className="text-muted-foreground/70">
+                      {d.reason}
+                      {d.score !== undefined && <span className="ml-1 font-mono">(score: {d.score})</span>}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Errors */}
       {errors.length > 0 && (
         <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5 space-y-1">
@@ -255,7 +290,7 @@ export function Step2Panel({
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center space-y-2">
           <p className="text-sm text-muted-foreground">No relevant signals found in this batch.</p>
           <p className="text-xs text-muted-foreground/70">
-            All {stats.totalScored} articles were scored below the relevance threshold. Try collecting with different keywords.
+            All {stats.totalScored} articles were scored below the relevance threshold (min score: 30). Try collecting with different keywords.
           </p>
         </div>
       )}
