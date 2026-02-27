@@ -277,8 +277,34 @@ serve(async (req) => {
           }
         }
 
-        // Report all results that were already streamed — no post-filtering
-        send({ type: "complete", totalScored: articles.length, totalRelevant: results.length, fromCache: cachedCount, preFiltered: preFilteredCount });
+        // ── Post-scoring semantic dedup: flag articles about same company+country+intent ──
+        const seen = new Map<string, number>(); // key -> first index
+        const dupIndices = new Set<number>();
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i];
+          const company = (r.scan.company || "").toLowerCase().trim();
+          const country = (r.scan.country || "").toLowerCase().trim();
+          const intent = r.scan.buyingIntentType || "";
+          if (!company) continue;
+          const key = `${company}|${country}|${intent}`;
+          if (seen.has(key)) {
+            dupIndices.add(i);
+          } else {
+            seen.set(key, i);
+          }
+        }
+
+        if (dupIndices.size > 0) {
+          // Mark duplicates — keep first occurrence, flag rest
+          const dedupedResults = results.filter((_, i) => !dupIndices.has(i));
+          const dupResults = results.filter((_, i) => dupIndices.has(i));
+          for (const dup of dupResults) {
+            send({ type: "duplicate_flagged", title: dup.article.title, company: dup.scan.company });
+          }
+          send({ type: "complete", totalScored: articles.length, totalRelevant: dedupedResults.length, fromCache: cachedCount, preFiltered: preFilteredCount, duplicatesRemoved: dupIndices.size });
+        } else {
+          send({ type: "complete", totalScored: articles.length, totalRelevant: results.length, fromCache: cachedCount, preFiltered: preFilteredCount, duplicatesRemoved: 0 });
+        }
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },

@@ -3,8 +3,8 @@ import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutLi
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
-import type { ScoredArticle, OpportunityPack, LeadStatus } from "@/lib/types";
-import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from "@/lib/types";
+import type { ScoredArticle, OpportunityPack, LeadStatus, BuyingIntentType } from "@/lib/types";
+import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, SIGNAL_LABELS } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -21,6 +21,17 @@ interface EnrichedResult {
   status: LeadStatus;
   createdAt?: string;
   articleSource?: string | null;
+  // BD context from Step 2 scoring
+  scanContext?: {
+    company?: string | null;
+    partnerOrSI?: string | null;
+    country?: string | null;
+    city?: string | null;
+    unitsMentioned?: number | null;
+    buyingIntentType?: string;
+    confidence?: string;
+    bdImpactScore?: number;
+  };
 }
 
 const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
@@ -126,6 +137,16 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
             dbId: data.dbId,
             status: "open",
             createdAt: new Date().toISOString(),
+            scanContext: {
+              company: sa.scan.company,
+              partnerOrSI: sa.scan.partnerOrSI,
+              country: sa.scan.country,
+              city: sa.scan.city,
+              unitsMentioned: sa.scan.unitsMentioned,
+              buyingIntentType: sa.scan.buyingIntentType,
+              confidence: sa.scan.confidence,
+              bdImpactScore: sa.scan.bdImpactScore,
+            },
           };
           setResults((prev) => [newResult, ...prev]);
           toast.success(`Analysed: ${data.pack.companyProfile.companyName}`);
@@ -260,73 +281,83 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Company</th>
-                <th className="py-2 pr-2 font-medium">Article</th>
-                <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
+                <th className="py-2 pr-2 font-medium w-28">Partner / SI</th>
+                <th className="py-2 pr-2 font-medium w-24">Location</th>
+                <th className="py-2 pr-2 font-medium w-20">Signal</th>
+                <th className="py-2 pr-2 font-medium w-14 text-center">Units</th>
+                <th className="py-2 pr-2 font-medium w-16">Confidence</th>
                 <th className="py-2 pr-2 font-medium w-20">Status</th>
-                <th className="py-2 pr-2 font-medium w-20">Date</th>
-                <th className="py-2 font-medium w-44 text-right">Actions</th>
+                <th className="py-2 font-medium w-36 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredResults.map((r, i) => (
-                <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
-                  <td className="py-2.5 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
-                  <td className="py-2.5 pr-2">
-                    <div className="font-medium text-foreground line-clamp-1">{r.pack.companyProfile.companyName}</div>
-                    <div className="text-muted-foreground">{r.pack.companyProfile.deploymentRegion}</div>
-                  </td>
-                  <td className="py-2.5 pr-2">
-                    <a
-                      href={r.articleUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-foreground hover:text-primary hover:underline line-clamp-1 inline-flex items-center gap-1"
-                    >
-                      <span className="truncate max-w-[250px]">{r.articleTitle}</span>
-                      <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
-                    </a>
-                  </td>
-                  <td className="py-2.5 pr-2 text-center">
-                    <span className="font-display font-bold text-primary">{r.pack.bdOpportunityAssessment.opportunityScore}</span>
-                  </td>
-                  <td className="py-2.5 pr-2">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>
-                      {LEAD_STATUS_LABELS[r.status]}
-                    </span>
-                  </td>
-                  <td className="py-2.5 pr-2 text-muted-foreground tabular-nums whitespace-nowrap">
-                    {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
-                  </td>
-                  <td className="py-2.5 text-right">
-                    <div className="flex items-center gap-0.5 justify-end">
-                      {r.status !== "acted_internally" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground" title="Add to FlytBase CRM">
-                          <Briefcase className="w-3 h-3" /> CRM
-                        </Button>
-                      )}
-                      {r.status !== "shared_with_partners" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground" title="Share with Partner">
-                          <Users className="w-3 h-3" /> Partner
-                        </Button>
-                      )}
-                      {r.status !== "duplicate" && (
-                        <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Mark as Duplicate">
-                          Dup
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Delete">
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                      <button
-                        onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)}
-                        className="p-1 text-muted-foreground hover:text-foreground"
+              {filteredResults.map((r, i) => {
+                const sc = r.scanContext;
+                const location = [sc?.city, sc?.country].filter(Boolean).join(", ") || r.pack.companyProfile.deploymentRegion || "—";
+                const intentLabel = sc?.buyingIntentType ? SIGNAL_LABELS[sc.buyingIntentType as BuyingIntentType] || sc.buyingIntentType : r.pack.deploymentSignal.eventType || "—";
+                const confidence = sc?.confidence || "—";
+                const partner = sc?.partnerOrSI || r.pack.bdOpportunityAssessment.partnershipAngle?.split(".")[0] || "—";
+                const units = sc?.unitsMentioned;
+
+                return (
+                  <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
+                    <td className="py-2.5 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
+                    <td className="py-2.5 pr-2">
+                      <div className="font-medium text-foreground line-clamp-1">{r.pack.companyProfile.companyName}</div>
+                      <a
+                        href={r.articleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-primary hover:underline line-clamp-1 inline-flex items-center gap-1 text-[10px]"
                       >
-                        {expandedDetailId === r.dbId ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        <span className="truncate max-w-[200px]">{r.articleTitle}</span>
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
+                      </a>
+                    </td>
+                    <td className="py-2.5 pr-2 text-foreground truncate">{partner}</td>
+                    <td className="py-2.5 pr-2 text-foreground truncate">{location}</td>
+                    <td className="py-2.5 pr-2">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">
+                        {intentLabel}
+                      </Badge>
+                    </td>
+                    <td className="py-2.5 pr-2 text-center tabular-nums text-foreground">{units ?? "—"}</td>
+                    <td className="py-2.5 pr-2">
+                      <span className={`text-[10px] font-medium ${confidence === "HIGH" ? "text-primary" : confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>
+                        {confidence}
+                      </span>
+                    </td>
+                    <td className="py-2.5 pr-2">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>
+                        {LEAD_STATUS_LABELS[r.status]}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-right">
+                      <div className="flex items-center gap-0.5 justify-end">
+                        {r.status !== "acted_internally" && (
+                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground" title="Add to FlytBase CRM">
+                            <Briefcase className="w-3 h-3" /> CRM
+                          </Button>
+                        )}
+                        {r.status !== "duplicate" && (
+                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Mark as Duplicate">
+                            Dup
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive" title="Delete">
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                        <button
+                          onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)}
+                          className="p-1 text-muted-foreground hover:text-foreground"
+                        >
+                          {expandedDetailId === r.dbId ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
@@ -346,8 +377,26 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
       {/* DETAIL VIEW */}
       {filteredResults.length > 0 && viewMode === "detail" && (
         <div className="space-y-6">
-          {filteredResults.map((r) => (
+          {filteredResults.map((r) => {
+            const sc = r.scanContext;
+            return (
             <div key={r.dbId || r.articleUrl} className="relative">
+              {/* BD context summary bar */}
+              <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border rounded-t-xl bg-muted/30 text-xs">
+                {sc?.partnerOrSI && <span className="text-foreground">🤝 {sc.partnerOrSI}</span>}
+                {(sc?.city || sc?.country) && <span className="text-foreground">📍 {[sc?.city, sc?.country].filter(Boolean).join(", ")}</span>}
+                {sc?.unitsMentioned && <span className="text-foreground">📦 {sc.unitsMentioned} units</span>}
+                {sc?.buyingIntentType && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {SIGNAL_LABELS[sc.buyingIntentType as BuyingIntentType] || sc.buyingIntentType}
+                  </Badge>
+                )}
+                {sc?.confidence && (
+                  <span className={`font-medium ${sc.confidence === "HIGH" ? "text-primary" : sc.confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>
+                    {sc.confidence}
+                  </span>
+                )}
+              </div>
               <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} pack={r.pack} />
               <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border bg-muted/20 rounded-b-xl flex-wrap">
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${LEAD_STATUS_COLORS[r.status]}`}>
@@ -362,11 +411,6 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
                       <Briefcase className="w-3.5 h-3.5" /> Add to CRM
                     </Button>
                   )}
-                  {r.status !== "shared_with_partners" && (
-                    <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                      <Users className="w-3.5 h-3.5" /> Share with Partner
-                    </Button>
-                  )}
                   {r.status !== "duplicate" && (
                     <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
                       Mark Duplicate
@@ -378,7 +422,8 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
