@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callLLM, RateLimitError, CreditsExhaustedError } from "../_shared/llm.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,14 +82,10 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Build context from what we have (title + snippet from Step 2)
     const contextParts = [
       `Article Title: ${title}`,
       `Source: ${source || "Unknown"}`,
@@ -106,48 +103,17 @@ serve(async (req) => {
       if (scanContext.unitsMentioned) contextParts.push(`Units Mentioned: ${scanContext.unitsMentioned}`);
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: DEEP_DIVE_PROMPT },
-          { role: "user", content: contextParts.join("\n") },
-        ],
-        tools: [DEEP_DIVE_TOOL],
-        tool_choice: { type: "function", function: { name: "create_opportunity_pack" } },
-      }),
+    const result = await callLLM({
+      systemPrompt: DEEP_DIVE_PROMPT,
+      userMessage: contextParts.join("\n"),
+      tools: [DEEP_DIVE_TOOL],
+      toolChoice: { type: "function", function: { name: "create_opportunity_pack" } },
+      // Uses Claude by default; switch to "gemini" when ready
     });
 
-    if (response.status === 429) {
-      return new Response(JSON.stringify({ error: "Rate limited — please try again shortly" }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!result.toolCall) throw new Error("No structured output from AI");
 
-    if (response.status === 402) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("LLM error:", response.status, errText);
-      throw new Error("AI analysis failed");
-    }
-
-    const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No structured output from AI");
-
-    const pack = JSON.parse(toolCall.function.arguments);
+    const pack = JSON.parse(result.toolCall.arguments);
 
     // Persist to DB
     const { data: dbRow, error: dbError } = await supabase
@@ -185,6 +151,16 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
+    if (e instanceof RateLimitError) {
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (e instanceof CreditsExhaustedError) {
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     console.error("deep-dive error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
