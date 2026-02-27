@@ -49,57 +49,6 @@ function getUrlSlug(url: string): string {
   }
 }
 
-/**
- * Resolve Google News redirect URLs to actual article URLs.
- * Strategy: Follow redirects. If still on news.google.com, try extracting from consent page.
- */
-async function resolveGoogleNewsUrl(url: string): Promise<string> {
-  if (!url.includes("news.google.com")) return url;
-  try {
-    // Try following redirects with GET (HEAD often doesn't work with Google)
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const resp = await fetch(url, {
-      redirect: "follow",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    // Check if redirected to actual article
-    if (resp.url && !resp.url.includes("news.google.com") && !resp.url.includes("consent.google.com")) {
-      return resp.url;
-    }
-
-    // Try parsing the HTML for meta refresh or canonical URL
-    const html = await resp.text();
-    
-    // Look for data-redirect attribute or canonical link
-    const canonicalMatch = html.match(/<link[^>]+rel="canonical"[^>]+href="([^"]+)"/);
-    if (canonicalMatch?.[1] && !canonicalMatch[1].includes("news.google.com")) {
-      return canonicalMatch[1];
-    }
-
-    // Look for meta refresh
-    const metaRefresh = html.match(/<meta[^>]+http-equiv="refresh"[^>]+content="[^"]*url=([^"'\s>]+)/i);
-    if (metaRefresh?.[1] && !metaRefresh[1].includes("news.google.com")) {
-      return metaRefresh[1];
-    }
-
-    // Look for article URL in a[href] pointing to external site
-    const articleLink = html.match(/href="(https?:\/\/(?!news\.google\.com)[^"]+)"/);
-    if (articleLink?.[1]) {
-      return articleLink[1];
-    }
-
-    return url;
-  } catch {
-    return url;
-  }
-}
-
 interface RSSArticle {
   id: string;
   keyword: string;
@@ -131,19 +80,31 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
     while ((match = itemRegex.exec(xml)) !== null) {
       const itemXml = match[1];
       const title = itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || "";
-      const link = itemXml.match(/<link>([\s\S]*?)<\/link>/)?.[1]?.trim() ||
-                   itemXml.match(/<link\s*\/>([\s\S]*?)(?=<)/)?.[1]?.trim() || "";
+      
+      // Google News RSS: <link/> followed by URL text, OR <link>URL</link>
+      let link = "";
+      const linkContent = itemXml.match(/<link>([\s\S]*?)<\/link>/);
+      if (linkContent?.[1]?.trim()) {
+        link = linkContent[1].trim();
+      } else {
+        // Self-closing <link/> followed by URL as text node
+        const selfClose = itemXml.match(/<link\s*\/>\s*(https?:\/\/[^\s<]+)/);
+        if (selfClose?.[1]) {
+          link = selfClose[1].trim();
+        }
+      }
+      
       const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || null;
       const source = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || null;
-      
-      // Try to extract the source URL from <source url="..."> attribute
       const sourceUrl = itemXml.match(/<source[^>]+url="([^"]+)"/)?.[1] || null;
 
       if (title && link) {
+        // Use title + source for ID to avoid Google News URL issues
+        const idSource = `${normalizeTitle(title)}|${source || ""}`;
         articles.push({
-          id: sha256(link),
+          id: sha256(idSource),
           keyword,
-          url: link,
+          url: sourceUrl || link, // Prefer source publisher URL, fallback to Google News link
           originalUrl: link,
           title,
           publishing_agency: source,
@@ -274,29 +235,8 @@ serve(async (req) => {
     // Store (limit 20 for MVP)
     const toStore = filtered.slice(0, 20);
 
-    // Resolve Google News URLs to actual publisher URLs (parallel, max 10 at a time)
-    const resolvedArticles: RSSArticle[] = [];
-    for (let i = 0; i < toStore.length; i += 10) {
-      const chunk = toStore.slice(i, i + 10);
-      const resolved = await Promise.all(
-        chunk.map(async (a) => {
-          const realUrl = await resolveGoogleNewsUrl(a.url);
-          return { ...a, url: realUrl, originalUrl: a.url, id: sha256(realUrl) };
-        })
-      );
-      resolvedArticles.push(...resolved);
-    }
-
-    // Also resolve URLs for allFetched (for table display) — resolve first 200 for performance
-    const allFetchedResolved = await Promise.all(
-      allArticles.slice(0, 200).map(async (a) => {
-        const realUrl = await resolveGoogleNewsUrl(a.url);
-        return { ...a, url: realUrl };
-      })
-    );
-
-    if (resolvedArticles.length > 0) {
-      const rows = resolvedArticles.map((a) => ({
+    if (toStore.length > 0) {
+      const rows = toStore.map((a) => ({
         id: a.id,
         keyword: a.keyword,
         url: a.url,
@@ -315,7 +255,7 @@ serve(async (req) => {
       }
     }
 
-    const latestPubAt = resolvedArticles
+    const latestPubAt = toStore
       .filter((a) => a.published_at)
       .sort((a, b) => new Date(b.published_at!).getTime() - new Date(a.published_at!).getTime())[0]?.published_at;
 
@@ -323,7 +263,7 @@ serve(async (req) => {
       .from("collection_runs")
       .update({
         articles_collected: totalCollected,
-        articles_stored: resolvedArticles.length,
+        articles_stored: toStore.length,
         completed_at: new Date().toISOString(),
         status: "completed",
         last_published_at: latestPubAt || null,
@@ -336,7 +276,7 @@ serve(async (req) => {
           id: batchId,
           keywords,
           articles_collected: totalCollected,
-          articles_stored: resolvedArticles.length,
+          articles_stored: toStore.length,
           after_dedup: afterDedup,
           after_date_filter: afterDateFilter,
           duplicates_removed: totalCollected - afterDedup,
@@ -346,7 +286,7 @@ serve(async (req) => {
           completed_at: new Date().toISOString(),
           status: "completed",
         },
-        articles: resolvedArticles.map(a => ({
+        articles: toStore.map(a => ({
           id: a.id,
           title: a.title,
           url: a.url,
@@ -354,7 +294,7 @@ serve(async (req) => {
           publishing_agency: a.publishing_agency,
           published_at: a.published_at,
         })),
-        allFetched: allFetchedResolved.map(a => ({
+        allFetched: allArticles.map(a => ({
           id: a.id,
           title: a.title,
           url: a.url,
@@ -366,7 +306,7 @@ serve(async (req) => {
           totalFetched: totalCollected,
           afterDedup: afterDedup,
           afterDateFilter: afterDateFilter,
-          afterCap: resolvedArticles.length,
+          afterCap: toStore.length,
           droppedByDedup: totalCollected - afterDedup,
           droppedByDateFilter: afterDedup - afterDateFilter,
           droppedByCap: Math.max(0, afterDateFilter - 20),
