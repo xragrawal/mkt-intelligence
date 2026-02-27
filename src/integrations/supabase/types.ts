@@ -14,7 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      collected_articles: {
+        Row: {
+          batch_id: string
+          created_at: string
+          id: string
+          keyword: string
+          published_at: string | null
+          publishing_agency: string | null
+          title: string
+          url: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          id: string
+          keyword: string
+          published_at?: string | null
+          publishing_agency?: string | null
+          title: string
+          url: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          id?: string
+          keyword?: string
+          published_at?: string | null
+          publishing_agency?: string | null
+          title?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      collection_runs: {
+        Row: {
+          articles_collected: number
+          articles_stored: number
+          completed_at: string | null
+          id: string
+          keywords: string[]
+          last_published_at: string | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          articles_collected?: number
+          articles_stored?: number
+          completed_at?: string | null
+          id: string
+          keywords: string[]
+          last_published_at?: string | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          articles_collected?: number
+          articles_stored?: number
+          completed_at?: string | null
+          id?: string
+          keywords?: string[]
+          last_published_at?: string | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      opportunity_packs: {
+        Row: {
+          article_source: string | null
+          article_title: string
+          article_url: string
+          company_name: string | null
+          created_at: string
+          crm_ready_notes: string | null
+          deployment_region: string | null
+          event_type: string | null
+          expansion_likelihood: string | null
+          id: string
+          inferred_industry: string | null
+          likely_buyer_type: string | null
+          maturity_signal: string | null
+          opportunity_score: number | null
+          partnership_angle: string | null
+          raw_json: Json | null
+          risk_factors: string | null
+          scale_description: string | null
+          strategic_entry_point: string | null
+          urgency_level: string | null
+          why_this_is_hot: string | null
+        }
+        Insert: {
+          article_source?: string | null
+          article_title: string
+          article_url: string
+          company_name?: string | null
+          created_at?: string
+          crm_ready_notes?: string | null
+          deployment_region?: string | null
+          event_type?: string | null
+          expansion_likelihood?: string | null
+          id?: string
+          inferred_industry?: string | null
+          likely_buyer_type?: string | null
+          maturity_signal?: string | null
+          opportunity_score?: number | null
+          partnership_angle?: string | null
+          raw_json?: Json | null
+          risk_factors?: string | null
+          scale_description?: string | null
+          strategic_entry_point?: string | null
+          urgency_level?: string | null
+          why_this_is_hot?: string | null
+        }
+        Update: {
+          article_source?: string | null
+          article_title?: string
+          article_url?: string
+          company_name?: string | null
+          created_at?: string
+          crm_ready_notes?: string | null
+          deployment_region?: string | null
+          event_type?: string | null
+          expansion_likelihood?: string | null
+          id?: string
+          inferred_industry?: string | null
+          likely_buyer_type?: string | null
+          maturity_signal?: string | null
+          opportunity_score?: number | null
+          partnership_angle?: string | null
+          raw_json?: Json | null
+          risk_factors?: string | null
+          scale_description?: string | null
+          strategic_entry_point?: string | null
+          urgency_level?: string | null
+          why_this_is_hot?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

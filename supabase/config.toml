@@ -1,1 +1,10 @@
 project_id = "foquizlrnwmseabjvpok"
+
+[functions.collect-news]
+verify_jwt = false
+
+[functions.score-articles]
+verify_jwt = false
+
+[functions.deep-dive]
+verify_jwt = false
