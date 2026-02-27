@@ -31,6 +31,37 @@ function getUrlSlug(url: string): string {
   }
 }
 
+/**
+ * Resolve Google News redirect URLs to actual article URLs.
+ * Google News RSS links look like: https://news.google.com/rss/articles/...
+ * We follow the redirect to get the real publisher URL.
+ */
+async function resolveGoogleNewsUrl(url: string): Promise<string> {
+  if (!url.includes("news.google.com")) return url;
+  try {
+    const resp = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      headers: { "User-Agent": "Signal/1.0" },
+    });
+    // The final URL after redirects is the actual article
+    if (resp.url && !resp.url.includes("news.google.com")) {
+      return resp.url;
+    }
+    // Try GET if HEAD didn't resolve
+    const getResp = await fetch(url, {
+      redirect: "follow",
+      headers: { "User-Agent": "Signal/1.0" },
+    });
+    if (getResp.url && !getResp.url.includes("news.google.com")) {
+      return getResp.url;
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 interface RSSArticle {
   id: string;
   keyword: string;
@@ -56,7 +87,6 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
     const xml = await response.text();
     const articles: RSSArticle[] = [];
 
-    // Simple XML parsing for RSS items
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
     let match;
     while ((match = itemRegex.exec(xml)) !== null) {
@@ -71,7 +101,7 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
         articles.push({
           id: sha256(link),
           keyword,
-          url: link,
+          url: link, // Will be resolved later
           title,
           publishing_agency: source,
           published_at: pubDate ? new Date(pubDate).toISOString() : null,
@@ -93,21 +123,14 @@ function deduplicateArticles(articles: RSSArticle[]): RSSArticle[] {
   const seenAgencyTime = new Set<string>();
 
   for (const article of articles) {
-    // Rule 1: Exact URL
     if (seen.has(article.url)) continue;
-
-    // Rule 2: Normalized title
     const normTitle = normalizeTitle(article.title);
     if (seenTitles.has(normTitle)) continue;
-
-    // Rule 3: Same agency + timestamp
     if (article.publishing_agency && article.published_at) {
       const key = `${article.publishing_agency}|${article.published_at}`;
       if (seenAgencyTime.has(key)) continue;
       seenAgencyTime.add(key);
     }
-
-    // Rule 4: URL slug
     const slug = getUrlSlug(article.url);
     if (seenSlugs.has(slug)) continue;
 
@@ -143,7 +166,6 @@ serve(async (req) => {
       { gl: "ES", hl: "es" },
     ];
 
-    // Create run record
     await supabase.from("collection_runs").insert({
       id: batchId,
       keywords,
@@ -175,10 +197,33 @@ serve(async (req) => {
     });
     const afterDateFilter = filtered.length;
 
-    // Store (limit 20 for MVP — expand later)
+    // Store (limit 20 for MVP)
     const toStore = filtered.slice(0, 20);
-    if (toStore.length > 0) {
-      const rows = toStore.map((a) => ({
+
+    // Resolve Google News URLs to actual publisher URLs (parallel, max 10 at a time)
+    const resolvedArticles: RSSArticle[] = [];
+    for (let i = 0; i < toStore.length; i += 10) {
+      const chunk = toStore.slice(i, i + 10);
+      const resolved = await Promise.all(
+        chunk.map(async (a) => {
+          const realUrl = await resolveGoogleNewsUrl(a.url);
+          return { ...a, url: realUrl, id: sha256(realUrl) };
+        })
+      );
+      resolvedArticles.push(...resolved);
+    }
+
+    // Also resolve URLs for allFetched (for table display) — resolve first 50 for performance
+    const allFetchedResolved = await Promise.all(
+      allArticles.slice(0, 200).map(async (a) => {
+        // Only resolve for display, don't block too long
+        const realUrl = await resolveGoogleNewsUrl(a.url);
+        return { ...a, url: realUrl };
+      })
+    );
+
+    if (resolvedArticles.length > 0) {
+      const rows = resolvedArticles.map((a) => ({
         id: a.id,
         keyword: a.keyword,
         url: a.url,
@@ -197,8 +242,7 @@ serve(async (req) => {
       }
     }
 
-    // Update run
-    const latestPubAt = toStore
+    const latestPubAt = resolvedArticles
       .filter((a) => a.published_at)
       .sort((a, b) => new Date(b.published_at!).getTime() - new Date(a.published_at!).getTime())[0]?.published_at;
 
@@ -206,7 +250,7 @@ serve(async (req) => {
       .from("collection_runs")
       .update({
         articles_collected: totalCollected,
-        articles_stored: toStore.length,
+        articles_stored: resolvedArticles.length,
         completed_at: new Date().toISOString(),
         status: "completed",
         last_published_at: latestPubAt || null,
@@ -219,7 +263,7 @@ serve(async (req) => {
           id: batchId,
           keywords,
           articles_collected: totalCollected,
-          articles_stored: toStore.length,
+          articles_stored: resolvedArticles.length,
           after_dedup: afterDedup,
           after_date_filter: afterDateFilter,
           duplicates_removed: totalCollected - afterDedup,
@@ -229,8 +273,8 @@ serve(async (req) => {
           completed_at: new Date().toISOString(),
           status: "completed",
         },
-        articles: toStore,
-        allFetched: allArticles.map(a => ({
+        articles: resolvedArticles,
+        allFetched: allFetchedResolved.map(a => ({
           id: a.id,
           title: a.title,
           url: a.url,
@@ -242,7 +286,7 @@ serve(async (req) => {
           totalFetched: totalCollected,
           afterDedup: afterDedup,
           afterDateFilter: afterDateFilter,
-          afterCap: toStore.length,
+          afterCap: resolvedArticles.length,
           droppedByDedup: totalCollected - afterDedup,
           droppedByDateFilter: afterDedup - afterDateFilter,
           droppedByCap: Math.max(0, afterDateFilter - 20),

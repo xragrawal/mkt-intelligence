@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, ChevronDown, ChevronUp, Table2 } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -21,7 +21,6 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [storedArticles, setStoredArticles] = useState<CollectedArticle[]>([]);
   const [allFetched, setAllFetched] = useState<FetchedArticleSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineBreakdown | null>(null);
-  const [showStored, setShowStored] = useState(false);
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
@@ -55,10 +54,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
       if (data?.error) throw new Error(data.error);
 
       onRunComplete(data.run);
-      if (data.articles) {
-        setStoredArticles(data.articles);
-        setShowStored(true);
-      }
+      if (data.articles) setStoredArticles(data.articles);
       if (data.allFetched) setAllFetched(data.allFetched);
       if (data.pipeline) setPipeline(data.pipeline);
       toast.success(`Stored ${data.run.articles_stored} articles (${data.run.articles_collected} fetched)`);
@@ -116,7 +112,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         {error && (
           <div className="flex items-center gap-2 text-sm text-destructive">
             <AlertCircle className="w-4 h-4" />
-            {error}
+            <span className="line-clamp-1">{error}</span>
           </div>
         )}
       </div>
@@ -129,10 +125,9 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
               <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
               <span className="text-foreground capitalize font-medium">{lastRun.status}</span>
               <span>•</span>
-              <span className="font-mono">{lastRun.id}</span>
+              <span className="font-mono truncate">{lastRun.id}</span>
             </div>
 
-            {/* Pipeline funnel visualization */}
             <div className="space-y-1.5">
               <PipelineRow label="Fetched from RSS" value={pipeline.totalFetched} />
               <PipelineArrow dropped={pipeline.droppedByDedup} reason="duplicates removed" />
@@ -140,9 +135,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
               <PipelineArrow dropped={pipeline.droppedByDateFilter} reason="older than 30 days" />
               <PipelineRow label="After date filter" value={pipeline.afterDateFilter} />
               {pipeline.droppedByCap > 0 && (
-                <>
-                  <PipelineArrow dropped={pipeline.droppedByCap} reason="capped at 20 for MVP" />
-                </>
+                <PipelineArrow dropped={pipeline.droppedByCap} reason="capped at 20 for MVP" />
               )}
               <PipelineRow label="Stored for scoring" value={pipeline.afterCap} variant="highlight" />
             </div>
@@ -220,23 +213,33 @@ function ArticleTableDialog({
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 bg-card z-10">
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-3 font-medium w-8">#</th>
-                <th className="py-2 pr-3 font-medium">Title</th>
-                <th className="py-2 pr-3 font-medium w-32">Source</th>
-                <th className="py-2 pr-3 font-medium w-24">Keyword</th>
-                <th className="py-2 font-medium w-24">Published</th>
+                <th className="py-2 pr-2 font-medium w-8">#</th>
+                <th className="py-2 pr-2 font-medium">Title</th>
+                <th className="py-2 pr-2 font-medium w-28">Source</th>
+                <th className="py-2 pr-2 font-medium w-20">Keyword</th>
+                <th className="py-2 font-medium w-20">Published</th>
               </tr>
             </thead>
             <tbody>
               {articles.map((a, i) => (
-                <tr key={a.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                  <td className="py-2 pr-3 text-muted-foreground tabular-nums">{i + 1}</td>
-                  <td className="py-2 pr-3 text-foreground leading-snug">{a.title}</td>
-                  <td className="py-2 pr-3 text-muted-foreground">{a.publishing_agency || "—"}</td>
-                  <td className="py-2 pr-3">
+                <tr key={a.id + i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <td className="py-2 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
+                  <td className="py-2 pr-2 text-foreground leading-snug">
+                    <a
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-primary hover:underline inline-flex items-start gap-1 group"
+                    >
+                      <span className="line-clamp-2">{a.title}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+                    </a>
+                  </td>
+                  <td className="py-2 pr-2 text-muted-foreground truncate max-w-[120px]">{a.publishing_agency || "—"}</td>
+                  <td className="py-2 pr-2">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">{a.keyword}</Badge>
                   </td>
-                  <td className="py-2 text-muted-foreground tabular-nums">
+                  <td className="py-2 text-muted-foreground tabular-nums whitespace-nowrap">
                     {a.published_at ? new Date(a.published_at).toLocaleDateString() : "—"}
                   </td>
                 </tr>

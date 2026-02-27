@@ -99,14 +99,15 @@ export interface PipelineBreakdown {
   droppedByCap: number;
 }
 
-export type LeadStatus = "open" | "shared_with_partners" | "acted_internally" | "closed" | "archived";
+export type LeadStatus = "open" | "shared_with_partners" | "acted_internally" | "closed" | "archived" | "duplicate";
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   open: "Open",
-  shared_with_partners: "Shared with Partners",
-  acted_internally: "Acted Internally",
+  shared_with_partners: "Shared with Partner",
+  acted_internally: "Added to FlytBase CRM",
   closed: "Closed",
   archived: "Archived",
+  duplicate: "Duplicate",
 };
 
 export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
@@ -115,6 +116,7 @@ export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   acted_internally: "bg-signal-expansion/15 text-signal-expansion",
   closed: "bg-signal-contract/15 text-signal-contract",
   archived: "bg-muted text-muted-foreground",
+  duplicate: "bg-destructive/15 text-destructive",
 };
 
 export const SIGNAL_COLORS: Record<BuyingIntentType, string> = {
