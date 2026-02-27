@@ -30,6 +30,7 @@ export function Step2Panel({
   const [progress, setProgress] = useState(0);
   const [filterType, setFilterType] = useState<BuyingIntentType | null>(null);
   const [sortBy, setSortBy] = useState<"score" | "date">("score");
+  const [stats, setStats] = useState<{ fromCache?: number; preFiltered?: number } | null>(null);
 
   const toggleSelect = useCallback(
     (article: ScoredArticle) => {
@@ -47,6 +48,7 @@ export function Step2Panel({
     if (!collectionRun) return;
     setIsScoring(true);
     setProgress(0);
+    setStats(null);
     const results: ScoredArticle[] = [];
 
     try {
@@ -89,9 +91,13 @@ export function Step2Panel({
             const parsed = JSON.parse(jsonStr);
             if (parsed.type === "progress") {
               setProgress(parsed.current);
+            } else if (parsed.type === "progress_note") {
+              console.log("Optimization:", parsed.message);
             } else if (parsed.type === "result") {
               results.push(parsed.data);
               onArticlesScored([...results]);
+            } else if (parsed.type === "complete") {
+              setStats({ fromCache: parsed.fromCache, preFiltered: parsed.preFiltered });
             } else if (parsed.type === "error") {
               console.warn("Scoring error for article:", parsed.message);
             }
@@ -134,7 +140,14 @@ export function Step2Panel({
           </div>
         </div>
         {scoredArticles.length > 0 && (
-          <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
+            {stats && (stats.fromCache || stats.preFiltered) ? (
+              <span className="text-xs text-muted-foreground/70">
+                ({stats.fromCache ? `${stats.fromCache} cached` : ""}{stats.fromCache && stats.preFiltered ? ", " : ""}{stats.preFiltered ? `${stats.preFiltered} pre-filtered` : ""})
+              </span>
+            ) : null}
+          </div>
         )}
       </div>
 
