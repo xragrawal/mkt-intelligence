@@ -104,7 +104,7 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
         articles.push({
           id: sha256(idSource),
           keyword,
-          url: sourceUrl || link, // Prefer source publisher URL, fallback to Google News link
+          url: link, // Use the actual article link (Google News redirect), NOT sourceUrl which is just the publisher domain
           originalUrl: link,
           title,
           publishing_agency: source,
