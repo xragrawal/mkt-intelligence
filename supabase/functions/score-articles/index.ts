@@ -25,6 +25,9 @@ function shouldPreFilter(title: string): string | null {
 // ── Prompt for batch scoring ──
 const SCORING_PROMPT = `You are a Business Development intelligence analyst for FlytBase, a drone technology company. Score news articles for commercial opportunity relevance.
 
+TRANSLATION RULE:
+If an article title is in any language other than English, first translate it to English mentally, then proceed with analysis using the translated meaning. In your output, always provide "whyItMatters" and all text fields in English regardless of the original language.
+
 SCORING RULES:
 - buyingIntentScore (0-50): How strong is the buying/deployment signal?
 - leadClarityScore (0-30): How clearly can you identify the buyer/company?
