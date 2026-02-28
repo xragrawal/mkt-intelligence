@@ -169,7 +169,14 @@ serve(async (req) => {
   }
 
   try {
-    const { keywords, filterDays = 30 } = await req.json();
+    const MAX_ARTICLES = 50;
+    const DEFAULT_FILTER_DAYS = 30;
+    const EDITIONS = [
+      { gl: "US", hl: "en" },
+      { gl: "ES", hl: "es" },
+    ];
+
+    const { keywords, filterDays = DEFAULT_FILTER_DAYS } = await req.json();
     if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
       return new Response(JSON.stringify({ error: "keywords array required" }), {
         status: 400,
@@ -196,10 +203,7 @@ serve(async (req) => {
     });
 
     const batchId = `batch_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15)}`;
-    const editions = [
-      { gl: "US", hl: "en" },
-      { gl: "ES", hl: "es" },
-    ];
+    const editions = EDITIONS;
 
     await supabase.from("collection_runs").insert({
       id: batchId,
@@ -232,8 +236,8 @@ serve(async (req) => {
     });
     const afterDateFilter = filtered.length;
 
-    // Store (limit 20 for MVP)
-    const toStore = filtered.slice(0, 20);
+    // Store up to MAX_ARTICLES
+    const toStore = filtered.slice(0, MAX_ARTICLES);
 
     if (toStore.length > 0) {
       const rows = toStore.map((a) => ({
@@ -281,7 +285,7 @@ serve(async (req) => {
           after_date_filter: afterDateFilter,
           duplicates_removed: totalCollected - afterDedup,
           date_filtered: afterDedup - afterDateFilter,
-          capped: afterDateFilter > 20 ? afterDateFilter - 20 : 0,
+          capped: afterDateFilter > MAX_ARTICLES ? afterDateFilter - MAX_ARTICLES : 0,
           started_at: new Date().toISOString(),
           completed_at: new Date().toISOString(),
           status: "completed",
@@ -309,7 +313,7 @@ serve(async (req) => {
           afterCap: toStore.length,
           droppedByDedup: totalCollected - afterDedup,
           droppedByDateFilter: afterDedup - afterDateFilter,
-          droppedByCap: Math.max(0, afterDateFilter - 20),
+          droppedByCap: Math.max(0, afterDateFilter - MAX_ARTICLES),
         },
         lastRunForKeywords: matchingLastRun ? {
           id: matchingLastRun.id,

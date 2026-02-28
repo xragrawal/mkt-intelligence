@@ -142,3 +142,14 @@ export const SIGNAL_LABELS: Record<BuyingIntentType, string> = {
 };
 
 export const DEFAULT_KEYWORDS = ["DJI Dock", "DJI 3"];
+
+export const DEFAULT_FILTER_DAYS = 30;
+
+export const FILTER_DAY_OPTIONS = [7, 14, 30, 60, 90] as const;
+
+export const MAX_ARTICLES_STORED = 50;
+
+export const NEWS_EDITIONS = [
+  { gl: "US", hl: "en" },
+  { gl: "ES", hl: "es" },
+] as const;
