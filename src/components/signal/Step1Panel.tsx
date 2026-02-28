@@ -3,7 +3,7 @@ import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, Externa
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DEFAULT_KEYWORDS } from "@/lib/types";
+import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED } from "@/lib/types";
 import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ interface LastRunInfo {
 export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [keywords, setKeywords] = useState<string[]>(DEFAULT_KEYWORDS);
   const [inputValue, setInputValue] = useState("");
-  const [filterDays, setFilterDays] = useState(30);
+  const [filterDays, setFilterDays] = useState(DEFAULT_FILTER_DAYS);
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<CollectedArticle[]>([]);
@@ -124,11 +124,9 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             onChange={(e) => setFilterDays(Number(e.target.value))}
             className="bg-muted border border-border rounded-md px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
-            <option value={7}>7 days</option>
-            <option value={14}>14 days</option>
-            <option value={30}>30 days</option>
-            <option value={60}>60 days</option>
-            <option value={90}>90 days</option>
+            {FILTER_DAY_OPTIONS.map((d) => (
+              <option key={d} value={d}>{d} days</option>
+            ))}
           </select>
         </div>
 
@@ -180,7 +178,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
               <PipelineArrow dropped={pipeline.droppedByDateFilter} reason={`older than ${filterDays} days`} />
               <PipelineRow label="After date filter" value={pipeline.afterDateFilter} />
               {pipeline.droppedByCap > 0 && (
-                <PipelineArrow dropped={pipeline.droppedByCap} reason="capped at 20 for MVP" />
+                <PipelineArrow dropped={pipeline.droppedByCap} reason={`capped at ${MAX_ARTICLES_STORED}`} />
               )}
               <PipelineRow label="Stored for scoring" value={pipeline.afterCap} variant="highlight" />
             </div>
