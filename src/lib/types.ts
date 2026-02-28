@@ -15,7 +15,6 @@ export interface ScoredArticle {
 }
 
 export interface ArticleScanResult {
-  isRelevant: boolean;
   dropReason: string | null;
   company: string | null;
   partnerOrSI: string | null;
