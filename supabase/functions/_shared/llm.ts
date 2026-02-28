@@ -50,7 +50,7 @@ async function callClaude(opts: LLMCallOptions): Promise<LLMResult> {
 
   const body: any = {
     model,
-    max_tokens: 4096,
+    max_tokens: 16384,
     system: opts.systemPrompt,
     messages: [{ role: "user", content: opts.userMessage }],
   };
