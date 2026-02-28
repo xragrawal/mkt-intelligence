@@ -236,28 +236,59 @@ serve(async (req) => {
     });
     const afterDateFilter = filtered.length;
 
-    // Store up to MAX_ARTICLES
+    // Store up to MAX_ARTICLES, but first check DB for existing duplicates
     const toStore = filtered.slice(0, MAX_ARTICLES);
 
     if (toStore.length > 0) {
-      const rows = toStore.map((a) => ({
-        id: a.id,
-        keyword: a.keyword,
-        url: a.url,
-        title: a.title,
-        publishing_agency: a.publishing_agency,
-        published_at: a.published_at,
-        batch_id: batchId,
-      }));
-
-      const { error: insertError } = await supabase
+      // Fetch existing articles to avoid inserting duplicates across runs
+      const { data: existingArticles } = await supabase
         .from("collected_articles")
-        .upsert(rows, { onConflict: "id" });
+        .select("id, url, title");
 
-      if (insertError) {
-        console.error("Insert error:", insertError);
+      const existingIds = new Set((existingArticles || []).map(a => a.id));
+      const existingUrls = new Set((existingArticles || []).map(a => a.url));
+      const existingContentWords = (existingArticles || []).map(a => getContentWords(a.title));
+
+      const newArticles = toStore.filter(a => {
+        // Skip if same ID already in DB
+        if (existingIds.has(a.id)) return false;
+        // Skip if same URL already in DB
+        if (existingUrls.has(a.url)) return false;
+        // Skip if fuzzy title match with existing DB article
+        const words = getContentWords(a.title);
+        for (const existing of existingContentWords) {
+          if (titleSimilarity(words, existing) >= 0.8) return false;
+        }
+        return true;
+      });
+
+      const dbDuplicatesSkipped = toStore.length - newArticles.length;
+      if (dbDuplicatesSkipped > 0) {
+        console.log(`Skipped ${dbDuplicatesSkipped} articles already in DB`);
+      }
+
+      if (newArticles.length > 0) {
+        const rows = newArticles.map((a) => ({
+          id: a.id,
+          keyword: a.keyword,
+          url: a.url,
+          title: a.title,
+          publishing_agency: a.publishing_agency,
+          published_at: a.published_at,
+          batch_id: batchId,
+        }));
+
+        const { error: insertError } = await supabase
+          .from("collected_articles")
+          .upsert(rows, { onConflict: "id" });
+
+        if (insertError) {
+          console.error("Insert error:", insertError);
+        }
       }
     }
+
+    const actualStored = toStore.length > 0 ? (typeof newArticles !== 'undefined' ? newArticles.length : toStore.length) : 0;
 
     const latestPubAt = toStore
       .filter((a) => a.published_at)
@@ -267,7 +298,7 @@ serve(async (req) => {
       .from("collection_runs")
       .update({
         articles_collected: totalCollected,
-        articles_stored: toStore.length,
+        articles_stored: actualStored,
         completed_at: new Date().toISOString(),
         status: "completed",
         last_published_at: latestPubAt || null,
@@ -280,7 +311,7 @@ serve(async (req) => {
           id: batchId,
           keywords,
           articles_collected: totalCollected,
-          articles_stored: toStore.length,
+          articles_stored: actualStored,
           after_dedup: afterDedup,
           after_date_filter: afterDateFilter,
           duplicates_removed: totalCollected - afterDedup,
