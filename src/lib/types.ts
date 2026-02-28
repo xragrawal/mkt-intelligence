@@ -150,7 +150,28 @@ export const MAX_ARTICLES_STORED = 50;
 
 export const MIN_BD_IMPACT_SCORE = 60;
 
-export const NEWS_EDITIONS = [
-  { gl: "US", hl: "en" },
-  { gl: "ES", hl: "es" },
+export const NEWS_REGIONS = [
+  "Global",
+  "US",
+  "UK",
+  "Canada",
+  "Australia",
+  "India",
+  "Singapore",
+  "South Africa",
+  "Nigeria",
+  "Spain",
+  "Germany",
+  "France",
+  "Italy",
+  "Mexico",
+  "Brazil",
+  "Japan",
+  "South Korea",
+  "Indonesia",
+  "China",
+  "Saudi Arabia",
+  "UAE",
 ] as const;
+
+export type NewsRegion = (typeof NEWS_REGIONS)[number];
