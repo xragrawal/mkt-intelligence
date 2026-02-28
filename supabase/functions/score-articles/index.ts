@@ -31,15 +31,16 @@ SCORING RULES:
 - sourceQualityScore (0-20): How reliable/authoritative is the source?
 - bdImpactScore = buyingIntentScore + leadClarityScore + sourceQualityScore (max 100)
 
-DROP these (isRelevant=false):
+Articles with bdImpactScore BELOW the provided threshold should have dropReason set explaining why.
+
+DROP these (give low scores):
 - Opinion pieces or editorials
 - Generic market analysis with no identifiable company
 - Product reviews/updates without deployment/contract/tender/partner action
 - Stock-only or financial commentary articles
-- Duplicate or near-duplicate coverage of the same event/company/deployment — keep only the highest-quality source
 
 IMPORTANT DEDUP RULE:
-If multiple articles cover the SAME company doing the SAME thing (same deployment, contract, partnership, etc.), mark only the BEST one as isRelevant=true (highest source quality). Mark the rest as isRelevant=false with dropReason="Duplicate coverage of same event".
+If multiple articles cover the SAME company doing the SAME thing (same deployment, contract, partnership, etc.), give the BEST one a high score and give duplicates a dropReason of "Duplicate coverage of same event".
 
 BUYING INTENT TYPES: LIVE_DEPLOYMENT, CONTRACT_AWARD, TENDER, PARTNER_ANNOUNCEMENT, EXPANSION, FUNDING, REGULATION, OTHER
 CONFIDENCE: HIGH, MEDIUM, LOW
@@ -60,8 +61,7 @@ const BATCH_SCORING_TOOL = {
             type: "object",
             properties: {
               articleIndex: { type: "number", description: "0-based index of the article in the input list" },
-              isRelevant: { type: "boolean" },
-              dropReason: { type: ["string", "null"] },
+              dropReason: { type: ["string", "null"], description: "Reason for dropping (duplicate, low relevance, etc.) or null if relevant" },
               company: { type: ["string", "null"] },
               partnerOrSI: { type: ["string", "null"] },
               country: { type: ["string", "null"] },
@@ -78,7 +78,7 @@ const BATCH_SCORING_TOOL = {
               whyItMatters: { type: "string" },
               confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
             },
-            required: ["articleIndex", "isRelevant", "buyingIntentType", "leadClarityScore", "buyingIntentScore", "sourceQualityScore", "bdImpactScore", "whyItMatters", "confidence"],
+            required: ["articleIndex", "buyingIntentType", "leadClarityScore", "buyingIntentScore", "sourceQualityScore", "bdImpactScore", "whyItMatters", "confidence"],
             additionalProperties: false,
           },
         },
@@ -89,7 +89,7 @@ const BATCH_SCORING_TOOL = {
   },
 };
 
-const MIN_BD_SCORE = 60;
+const DEFAULT_MIN_SCORE = 60;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -105,7 +105,7 @@ serve(async (req) => {
       });
     }
 
-    const scoreThreshold = typeof minScore === "number" ? minScore : MIN_BD_SCORE;
+    const scoreThreshold = typeof minScore === "number" ? minScore : DEFAULT_MIN_SCORE;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -146,18 +146,21 @@ serve(async (req) => {
 
         const results: Array<{ article: typeof articles[0]; scan: any }> = [];
 
-        // Emit cached results immediately (only those above threshold)
+        // Emit cached results — use bdImpactScore >= threshold as relevance gate
         let cachedCount = 0;
         for (const [articleId, cachedScore] of cachedMap) {
           const article = articleMap.get(articleId);
-          if (!article || !cachedScore.is_relevant) continue;
+          if (!article) continue;
           const bdScore = cachedScore.bd_impact_score || 0;
           if (bdScore < scoreThreshold) {
-            send({ type: "dropped", title: article.title, reason: `Score ${bdScore} below threshold ${scoreThreshold}`, score: bdScore });
+            send({ type: "dropped", title: article.title, reason: cachedScore.drop_reason || `Score ${bdScore} below threshold ${scoreThreshold}`, score: bdScore });
+            continue;
+          }
+          if (cachedScore.drop_reason) {
+            send({ type: "dropped", title: article.title, reason: cachedScore.drop_reason, score: bdScore });
             continue;
           }
           const scan = {
-            isRelevant: cachedScore.is_relevant,
             company: cachedScore.company,
             partnerOrSI: cachedScore.partner_or_si,
             country: cachedScore.country,
@@ -170,6 +173,7 @@ serve(async (req) => {
             bdImpactScore: bdScore,
             whyItMatters: cachedScore.why_it_matters,
             confidence: cachedScore.confidence,
+            dropReason: null,
           };
           results.push({ article, scan });
           send({ type: "result", data: { article, scan } });
@@ -192,6 +196,7 @@ serve(async (req) => {
               is_relevant: false,
               drop_reason: dropReason,
               buying_intent_type: "OTHER",
+              bd_impact_score: 0,
               why_it_matters: "Pre-filtered: " + dropReason,
               confidence: "HIGH",
             }, { onConflict: "article_id" });
@@ -217,7 +222,7 @@ serve(async (req) => {
           try {
             const result = await callLLM({
               systemPrompt: SCORING_PROMPT,
-              userMessage: `Score these ${toScore.length} articles. Mark duplicates covering the same event. Only articles with bdImpactScore >= ${scoreThreshold} should be marked isRelevant=true:\n\n${articleList}`,
+              userMessage: `Score these ${toScore.length} articles. Mark duplicates covering the same event. Threshold is ${scoreThreshold} — articles below this are low-priority:\n\n${articleList}`,
               tools: [BATCH_SCORING_TOOL],
               toolChoice: { type: "function", function: { name: "score_articles_batch" } },
               model: undefined,
@@ -233,17 +238,18 @@ serve(async (req) => {
                 if (idx < 0 || idx >= toScore.length) continue;
                 const article = toScore[idx];
 
-                // Enforce score threshold
-                if (scan.bdImpactScore < scoreThreshold) {
-                  scan.isRelevant = false;
-                  scan.dropReason = scan.dropReason || `Score ${scan.bdImpactScore} below threshold ${scoreThreshold}`;
+                // Relevance is purely score-based + dedup
+                const isRelevant = scan.bdImpactScore >= scoreThreshold && !scan.dropReason;
+
+                if (!isRelevant && !scan.dropReason) {
+                  scan.dropReason = `Score ${scan.bdImpactScore} below threshold ${scoreThreshold}`;
                 }
 
                 await supabase.from("scored_articles").upsert({
                   article_id: article.id,
                   batch_id: batchId,
-                  is_relevant: scan.isRelevant,
-                  drop_reason: scan.dropReason,
+                  is_relevant: isRelevant,
+                  drop_reason: scan.dropReason || null,
                   company: scan.company,
                   partner_or_si: scan.partnerOrSI,
                   country: scan.country,
@@ -258,11 +264,11 @@ serve(async (req) => {
                   confidence: scan.confidence,
                 }, { onConflict: "article_id" });
 
-                if (scan.isRelevant) {
-                  results.push({ article, scan });
-                  send({ type: "result", data: { article, scan } });
+                if (isRelevant) {
+                  results.push({ article, scan: { ...scan, dropReason: null } });
+                  send({ type: "result", data: { article, scan: { ...scan, dropReason: null } } });
                 } else {
-                  send({ type: "dropped", title: article.title, reason: scan.dropReason || "Scored as not relevant", score: scan.bdImpactScore });
+                  send({ type: "dropped", title: article.title, reason: scan.dropReason || "Below threshold", score: scan.bdImpactScore });
                 }
               }
             }
@@ -279,7 +285,7 @@ serve(async (req) => {
         }
 
         send({ type: "progress", current: articles.length, total: articles.length });
-        send({ type: "complete", totalScored: articles.length, totalRelevant: results.length, fromCache: cachedCount, preFiltered: preFilteredCount, duplicatesRemoved: 0, scoreThreshold });
+        send({ type: "complete", totalScored: articles.length, totalRelevant: results.length, fromCache: cachedCount, preFiltered: preFilteredCount, scoreThreshold });
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },
