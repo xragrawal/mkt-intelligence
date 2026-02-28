@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
-import { SIGNAL_LABELS } from "@/lib/types";
+import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE } from "@/lib/types";
 import { toast } from "sonner";
 
 interface Step2PanelProps {
@@ -81,7 +81,7 @@ export function Step2Panel({
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ batchId: collectionRun.id }),
+        body: JSON.stringify({ batchId: collectionRun.id, minScore: MIN_BD_IMPACT_SCORE }),
       });
 
       if (!resp.ok) {
@@ -321,7 +321,7 @@ export function Step2Panel({
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center space-y-2">
           <p className="text-sm text-muted-foreground">No relevant signals found in this batch.</p>
           <p className="text-xs text-muted-foreground/70">
-            All {stats.totalScored} articles were scored below the relevance threshold (min score: 30). Try collecting with different keywords.
+            All {stats.totalScored} articles were scored below the relevance threshold (min score: {MIN_BD_IMPACT_SCORE}). Try collecting with different keywords.
           </p>
         </div>
       )}

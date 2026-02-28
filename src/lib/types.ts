@@ -149,6 +149,8 @@ export const FILTER_DAY_OPTIONS = [7, 14, 30, 60, 90] as const;
 
 export const MAX_ARTICLES_STORED = 50;
 
+export const MIN_BD_IMPACT_SCORE = 60;
+
 export const NEWS_EDITIONS = [
   { gl: "US", hl: "en" },
   { gl: "ES", hl: "es" },
