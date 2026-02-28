@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED } from "@/lib/types";
-import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS } from "@/lib/types";
+import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -24,6 +25,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [keywords, setKeywords] = useState<string[]>(DEFAULT_KEYWORDS);
   const [inputValue, setInputValue] = useState("");
   const [filterDays, setFilterDays] = useState(DEFAULT_FILTER_DAYS);
+  const [region, setRegion] = useState<NewsRegion>("Global");
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<CollectedArticle[]>([]);
@@ -57,7 +59,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke("collect-news", {
-        body: { keywords, filterDays },
+        body: { keywords, filterDays, region },
       });
 
       if (fnError) throw new Error(fnError.message);
@@ -114,11 +116,11 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         </div>
       </div>
 
-      {/* Date range selector */}
+      {/* Date range & region selector */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <label className="text-sm text-muted-foreground">Collect articles from last</label>
+          <label className="text-sm text-muted-foreground">Last</label>
           <select
             value={filterDays}
             onChange={(e) => setFilterDays(Number(e.target.value))}
@@ -128,6 +130,21 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
               <option key={d} value={d}>{d} days</option>
             ))}
           </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Globe className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm text-muted-foreground">Region</label>
+          <Select value={region} onValueChange={(v) => setRegion(v as NewsRegion)}>
+            <SelectTrigger className="w-[140px] h-8 text-sm bg-muted border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {NEWS_REGIONS.map((r) => (
+                <SelectItem key={r} value={r}>{r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Last run intelligence */}

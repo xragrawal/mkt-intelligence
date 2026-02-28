@@ -171,12 +171,36 @@ serve(async (req) => {
   try {
     const MAX_ARTICLES = 50;
     const DEFAULT_FILTER_DAYS = 30;
-    const EDITIONS = [
-      { gl: "US", hl: "en" },
-      { gl: "ES", hl: "es" },
+
+    const ALL_EDITIONS = [
+      { gl: "US", hl: "en", label: "US" },
+      { gl: "GB", hl: "en", label: "UK" },
+      { gl: "ES", hl: "es", label: "Spain" },
+      { gl: "DE", hl: "de", label: "Germany" },
+      { gl: "FR", hl: "fr", label: "France" },
+      { gl: "IN", hl: "en", label: "India" },
+      { gl: "AU", hl: "en", label: "Australia" },
+      { gl: "BR", hl: "pt-BR", label: "Brazil" },
+      { gl: "JP", hl: "ja", label: "Japan" },
+      { gl: "KR", hl: "ko", label: "South Korea" },
+      { gl: "CA", hl: "en", label: "Canada" },
+      { gl: "IT", hl: "it", label: "Italy" },
+      { gl: "MX", hl: "es", label: "Mexico" },
+      { gl: "SA", hl: "ar", label: "Saudi Arabia" },
+      { gl: "AE", hl: "ar", label: "UAE" },
+      { gl: "SG", hl: "en", label: "Singapore" },
+      { gl: "ZA", hl: "en", label: "South Africa" },
+      { gl: "NG", hl: "en", label: "Nigeria" },
+      { gl: "ID", hl: "id", label: "Indonesia" },
+      { gl: "CN", hl: "zh-CN", label: "China" },
     ];
 
-    const { keywords, filterDays = DEFAULT_FILTER_DAYS } = await req.json();
+    const { keywords, filterDays = DEFAULT_FILTER_DAYS, region = "Global" } = await req.json();
+
+    // Filter editions based on user-selected region
+    const editions = region === "Global"
+      ? ALL_EDITIONS
+      : ALL_EDITIONS.filter(e => e.label === region || e.gl === region);
     if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
       return new Response(JSON.stringify({ error: "keywords array required" }), {
         status: 400,
@@ -203,7 +227,7 @@ serve(async (req) => {
     });
 
     const batchId = `batch_${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 15)}`;
-    const editions = EDITIONS;
+    // editions already filtered above based on region param
 
     await supabase.from("collection_runs").insert({
       id: batchId,
