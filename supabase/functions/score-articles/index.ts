@@ -254,7 +254,12 @@ serve(async (req) => {
             if (!result.toolCall) {
               send({ type: "error", message: "No structured output from LLM" });
             } else {
-              const { scores } = JSON.parse(result.toolCall.arguments);
+              const parsed = JSON.parse(result.toolCall.arguments);
+              const scores = Array.isArray(parsed) ? parsed : (parsed.scores || []);
+              if (!Array.isArray(scores) || scores.length === 0) {
+                console.error("LLM returned unexpected structure:", JSON.stringify(parsed).slice(0, 500));
+                send({ type: "error", message: "LLM returned no scorable results. Try again." });
+              } else {
 
               for (const scan of scores) {
                 const idx = scan.articleIndex;
@@ -295,6 +300,7 @@ serve(async (req) => {
                 }
               }
             }
+              }
           } catch (e) {
             if (e instanceof CreditsExhaustedError) {
               send({ type: "error", message: e.message });
