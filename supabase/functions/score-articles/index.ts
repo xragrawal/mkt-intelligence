@@ -120,7 +120,27 @@ serve(async (req) => {
 
     if (fetchError) throw new Error(fetchError.message);
     if (!articles || articles.length === 0) {
-      return new Response(JSON.stringify({ error: "No articles found for batch" }), {
+      // Check if articles exist but were scored in a previous batch
+      const { count: scoredCount } = await supabase
+        .from("scored_articles")
+        .select("*", { count: "exact", head: true })
+        .eq("batch_id", batchId);
+
+      if (scoredCount && scoredCount > 0) {
+        return new Response(JSON.stringify({ 
+          error: "all_scored",
+          message: `All ${scoredCount} articles from this batch have already been scored. Your scored articles are available in Step 3 — Opportunity Intelligence.`,
+          scoredCount,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ 
+        error: "no_articles",
+        message: "No articles found for this batch. Run Step 1 to collect articles first.",
+      }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

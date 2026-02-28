@@ -74,7 +74,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, title, source, scanContext } = await req.json();
+    const { url, title, source, scanContext, batchContext } = await req.json();
     if (!url || !title) {
       return new Response(JSON.stringify({ error: "url and title required" }), {
         status: 400,
@@ -116,29 +116,39 @@ serve(async (req) => {
     const pack = JSON.parse(result.toolCall.arguments);
 
     // Persist to DB
+    const insertData: Record<string, unknown> = {
+      article_url: url,
+      article_title: title,
+      article_source: source,
+      company_name: pack.companyProfile.companyName,
+      inferred_industry: pack.companyProfile.inferredIndustry,
+      deployment_region: pack.companyProfile.deploymentRegion,
+      likely_buyer_type: pack.companyProfile.likelyBuyerType,
+      maturity_signal: pack.companyProfile.maturitySignal,
+      event_type: pack.deploymentSignal.eventType,
+      scale_description: pack.deploymentSignal.scale,
+      urgency_level: pack.deploymentSignal.urgencyLevel,
+      expansion_likelihood: pack.deploymentSignal.expansionLikelihood,
+      why_this_is_hot: pack.bdOpportunityAssessment.whyThisIsHot,
+      strategic_entry_point: pack.bdOpportunityAssessment.strategicEntryPoint,
+      partnership_angle: pack.bdOpportunityAssessment.partnershipAngle,
+      risk_factors: pack.bdOpportunityAssessment.riskFactors,
+      opportunity_score: pack.bdOpportunityAssessment.opportunityScore,
+      crm_ready_notes: pack.crmReadyNotes,
+      raw_json: pack,
+    };
+
+    // Add batch reference if provided
+    if (batchContext) {
+      if (batchContext.batchId) insertData.batch_id = batchContext.batchId;
+      if (batchContext.keywords) insertData.keywords = batchContext.keywords;
+      if (batchContext.filterDays) insertData.filter_days = batchContext.filterDays;
+      if (batchContext.collectionRanAt) insertData.collection_ran_at = batchContext.collectionRanAt;
+    }
+
     const { data: dbRow, error: dbError } = await supabase
       .from("opportunity_packs")
-      .insert({
-        article_url: url,
-        article_title: title,
-        article_source: source,
-        company_name: pack.companyProfile.companyName,
-        inferred_industry: pack.companyProfile.inferredIndustry,
-        deployment_region: pack.companyProfile.deploymentRegion,
-        likely_buyer_type: pack.companyProfile.likelyBuyerType,
-        maturity_signal: pack.companyProfile.maturitySignal,
-        event_type: pack.deploymentSignal.eventType,
-        scale_description: pack.deploymentSignal.scale,
-        urgency_level: pack.deploymentSignal.urgencyLevel,
-        expansion_likelihood: pack.deploymentSignal.expansionLikelihood,
-        why_this_is_hot: pack.bdOpportunityAssessment.whyThisIsHot,
-        strategic_entry_point: pack.bdOpportunityAssessment.strategicEntryPoint,
-        partnership_angle: pack.bdOpportunityAssessment.partnershipAngle,
-        risk_factors: pack.bdOpportunityAssessment.riskFactors,
-        opportunity_score: pack.bdOpportunityAssessment.opportunityScore,
-        crm_ready_notes: pack.crmReadyNotes,
-        raw_json: pack,
-      })
+      .insert(insertData)
       .select("id")
       .single();
 

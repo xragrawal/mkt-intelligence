@@ -29,6 +29,7 @@ const Index = () => {
         <Step3Panel
           selectedArticles={selectedArticles}
           enabled={step2Done && selectedArticles.length > 0}
+          collectionRun={collectionRun}
         />
       </main>
     </div>

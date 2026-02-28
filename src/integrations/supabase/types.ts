@@ -85,14 +85,18 @@ export type Database = {
           article_source: string | null
           article_title: string
           article_url: string
+          batch_id: string | null
+          collection_ran_at: string | null
           company_name: string | null
           created_at: string
           crm_ready_notes: string | null
           deployment_region: string | null
           event_type: string | null
           expansion_likelihood: string | null
+          filter_days: number | null
           id: string
           inferred_industry: string | null
+          keywords: string[] | null
           likely_buyer_type: string | null
           maturity_signal: string | null
           notes: string | null
@@ -111,14 +115,18 @@ export type Database = {
           article_source?: string | null
           article_title: string
           article_url: string
+          batch_id?: string | null
+          collection_ran_at?: string | null
           company_name?: string | null
           created_at?: string
           crm_ready_notes?: string | null
           deployment_region?: string | null
           event_type?: string | null
           expansion_likelihood?: string | null
+          filter_days?: number | null
           id?: string
           inferred_industry?: string | null
+          keywords?: string[] | null
           likely_buyer_type?: string | null
           maturity_signal?: string | null
           notes?: string | null
@@ -137,14 +145,18 @@ export type Database = {
           article_source?: string | null
           article_title?: string
           article_url?: string
+          batch_id?: string | null
+          collection_ran_at?: string | null
           company_name?: string | null
           created_at?: string
           crm_ready_notes?: string | null
           deployment_region?: string | null
           event_type?: string | null
           expansion_likelihood?: string | null
+          filter_days?: number | null
           id?: string
           inferred_industry?: string | null
+          keywords?: string[] | null
           likely_buyer_type?: string | null
           maturity_signal?: string | null
           notes?: string | null
