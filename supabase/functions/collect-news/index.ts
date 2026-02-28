@@ -59,19 +59,40 @@ interface RSSArticle {
   published_at: string | null;
 }
 
+async function fetchWithRetry(url: string, retries = 2, delayMs = 1500): Promise<Response | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+      });
+      if (response.ok) return response;
+      if (response.status === 503 && attempt < retries) {
+        console.warn(`503 retry ${attempt + 1} for ${url}`);
+        await new Promise(r => setTimeout(r, delayMs * (attempt + 1)));
+        continue;
+      }
+      console.error(`RSS fetch failed: ${response.status} for ${url}`);
+      return null;
+    } catch (e) {
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, delayMs));
+        continue;
+      }
+      console.error(`RSS fetch error:`, e);
+      return null;
+    }
+  }
+  return null;
+}
+
 async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang: string = "en"): Promise<RSSArticle[]> {
   const encodedKeyword = encodeURIComponent(`"${keyword}"`);
   const rssUrl = `https://news.google.com/rss/search?q=${encodedKeyword}&hl=${lang}&gl=${edition}&ceid=${edition}:${lang}`;
 
-  try {
-    const response = await fetch(rssUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; Signal/1.0)" },
-    });
-    if (!response.ok) {
-      console.error(`RSS fetch failed for "${keyword}" (${edition}:${lang}): ${response.status}`);
-      return [];
-    }
+  const response = await fetchWithRetry(rssUrl);
+  if (!response) return [];
 
+  try {
     const xml = await response.text();
     const articles: RSSArticle[] = [];
 
@@ -81,13 +102,11 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
       const itemXml = match[1];
       const title = itemXml.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || "";
       
-      // Google News RSS: <link/> followed by URL text, OR <link>URL</link>
       let link = "";
       const linkContent = itemXml.match(/<link>([\s\S]*?)<\/link>/);
       if (linkContent?.[1]?.trim()) {
         link = linkContent[1].trim();
       } else {
-        // Self-closing <link/> followed by URL as text node
         const selfClose = itemXml.match(/<link\s*\/>\s*(https?:\/\/[^\s<]+)/);
         if (selfClose?.[1]) {
           link = selfClose[1].trim();
@@ -96,15 +115,13 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
       
       const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || null;
       const source = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || null;
-      const sourceUrl = itemXml.match(/<source[^>]+url="([^"]+)"/)?.[1] || null;
 
       if (title && link) {
-        // Use title + source for ID to avoid Google News URL issues
         const idSource = `${normalizeTitle(title)}|${source || ""}`;
         articles.push({
           id: sha256(idSource),
           keyword,
-          url: link, // Use the actual article link (Google News redirect), NOT sourceUrl which is just the publisher domain
+          url: link,
           originalUrl: link,
           title,
           publishing_agency: source,
@@ -115,9 +132,23 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
 
     return articles;
   } catch (e) {
-    console.error(`RSS error for "${keyword}":`, e);
+    console.error(`RSS parse error for "${keyword}":`, e);
     return [];
   }
+}
+
+/** Run promises in batches to avoid rate limiting */
+async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency = 5, delayBetweenMs = 300): Promise<T[]> {
+  const results: T[] = [];
+  for (let i = 0; i < tasks.length; i += concurrency) {
+    const batch = tasks.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(fn => fn()));
+    results.push(...batchResults);
+    if (i + concurrency < tasks.length) {
+      await new Promise(r => setTimeout(r, delayBetweenMs));
+    }
+  }
+  return results;
 }
 
 function deduplicateArticles(articles: RSSArticle[]): { deduped: RSSArticle[]; removed: number } {
@@ -235,14 +266,12 @@ serve(async (req) => {
       status: "running",
     });
 
-    // Fetch articles for all keyword x edition combos
-    let allArticles: RSSArticle[] = [];
-    for (const keyword of keywords) {
-      for (const edition of editions) {
-        const articles = await fetchGoogleNewsRSS(keyword, edition.gl, edition.hl);
-        allArticles = allArticles.concat(articles);
-      }
-    }
+    // Fetch articles for all keyword x edition combos (parallel batched to avoid rate limits)
+    const fetchTasks = keywords.flatMap(keyword =>
+      editions.map(edition => () => fetchGoogleNewsRSS(keyword, edition.gl, edition.hl))
+    );
+    const batchResults = await parallelBatch(fetchTasks, 4, 500);
+    const allArticles = batchResults.flat();
 
     const totalCollected = allArticles.length;
 
