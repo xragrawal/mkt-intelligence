@@ -3,7 +3,7 @@ import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutLi
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
-import type { ScoredArticle, OpportunityPack, LeadStatus, BuyingIntentType } from "@/lib/types";
+import type { ScoredArticle, OpportunityPack, LeadStatus, BuyingIntentType, CollectionRunSummary } from "@/lib/types";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, SIGNAL_LABELS } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 interface Step3PanelProps {
   selectedArticles: ScoredArticle[];
   enabled: boolean;
+  collectionRun?: CollectionRunSummary | null;
 }
 
 interface EnrichedResult {
@@ -32,11 +33,18 @@ interface EnrichedResult {
     confidence?: string;
     bdImpactScore?: number;
   };
+  // Batch reference
+  batchRef?: {
+    batchId?: string;
+    keywords?: string[];
+    filterDays?: number;
+    collectionRanAt?: string;
+  };
 }
 
 const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
 
-export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
+export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3PanelProps) {
   const [isEnriching, setIsEnriching] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<EnrichedResult[]>([]);
@@ -59,13 +67,19 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
 
       if (error) throw error;
       if (data && data.length > 0) {
-        const loaded: EnrichedResult[] = data.map((row) => ({
+          const loaded: EnrichedResult[] = data.map((row: any) => ({
           articleUrl: row.article_url,
           articleTitle: row.article_title,
           articleSource: row.article_source,
           dbId: row.id,
           status: (row.status as LeadStatus) || "open",
           createdAt: row.created_at,
+          batchRef: {
+            batchId: row.batch_id || undefined,
+            keywords: row.keywords || undefined,
+            filterDays: row.filter_days || undefined,
+            collectionRanAt: row.collection_ran_at || undefined,
+          },
           pack: {
             companyProfile: {
               companyName: row.company_name || "Unknown",
@@ -120,6 +134,12 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
             title: sa.article.title,
             source: sa.article.publishing_agency,
             scanContext: sa.scan,
+            batchContext: collectionRun ? {
+              batchId: collectionRun.id,
+              keywords: collectionRun.keywords,
+              filterDays: undefined, // Could be passed from Step 1 config
+              collectionRanAt: collectionRun.started_at,
+            } : undefined,
           },
         });
 
@@ -129,6 +149,11 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
         }
 
         if (data?.pack) {
+          const batchRef = collectionRun ? {
+            batchId: collectionRun.id,
+            keywords: collectionRun.keywords,
+            collectionRanAt: collectionRun.started_at,
+          } : undefined;
           const newResult: EnrichedResult = {
             articleUrl: sa.article.url,
             articleTitle: sa.article.title,
@@ -147,6 +172,7 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
               confidence: sa.scan.confidence,
               bdImpactScore: sa.scan.bdImpactScore,
             },
+            batchRef,
           };
           setResults((prev) => [newResult, ...prev]);
           toast.success(`Analysed: ${data.pack.companyProfile.companyName}`);
@@ -280,6 +306,7 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 px-2 font-medium">#</th>
+                <th className="py-2 px-2 font-medium">Batch Ref</th>
                 <th className="py-2 px-2 font-medium">Company</th>
                 <th className="py-2 px-2 font-medium">Partner / SI</th>
                 <th className="py-2 px-2 font-medium">Location</th>
@@ -299,9 +326,28 @@ export function Step3Panel({ selectedArticles, enabled }: Step3PanelProps) {
                 const partner = sc?.partnerOrSI || "—";
                 const units = sc?.unitsMentioned;
 
-                return (
+                  return (
                   <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
                     <td className="py-2 px-2 text-muted-foreground tabular-nums align-top">{i + 1}</td>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 120 }}>
+                      {r.batchRef?.keywords ? (
+                        <div className="space-y-0.5">
+                          <div className="text-[10px] text-foreground font-medium truncate" title={r.batchRef.keywords.join(", ")}>
+                            {r.batchRef.keywords.join(", ")}
+                          </div>
+                          {r.batchRef.collectionRanAt && (
+                            <div className="text-[10px] text-muted-foreground">
+                              {new Date(r.batchRef.collectionRanAt).toLocaleDateString()}
+                            </div>
+                          )}
+                          {r.batchRef.filterDays && (
+                            <div className="text-[10px] text-muted-foreground">{r.batchRef.filterDays}d window</div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
                       <div className="font-medium text-foreground break-words leading-tight">{r.pack.companyProfile.companyName}</div>
                       <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline text-[10px] break-words leading-tight inline-flex items-center gap-0.5 mt-0.5">

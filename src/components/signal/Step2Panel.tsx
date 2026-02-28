@@ -86,7 +86,28 @@ export function Step2Panel({
 
       if (!resp.ok) {
         const errText = await resp.text();
-        throw new Error(errText || `HTTP ${resp.status}`);
+        try {
+          const errJson = JSON.parse(errText);
+          if (errJson.error === "no_articles") {
+            toast.info(errJson.message || "No articles found. Run Step 1 first.");
+            return;
+          }
+          throw new Error(errJson.message || errText);
+        } catch (parseErr) {
+          if (parseErr instanceof SyntaxError) throw new Error(errText || `HTTP ${resp.status}`);
+          throw parseErr;
+        }
+      }
+
+      // Handle "all scored" response (200 but no SSE stream)
+      const contentType = resp.headers.get("Content-Type") || "";
+      if (contentType.includes("application/json")) {
+        const jsonResp = await resp.json();
+        if (jsonResp.error === "all_scored") {
+          toast.info(jsonResp.message || "All articles already scored — check Step 3.");
+          setStats({ totalScored: jsonResp.scoredCount, totalRelevant: 0, fromCache: jsonResp.scoredCount, preFiltered: 0 });
+          return;
+        }
       }
 
       const reader = resp.body?.getReader();
@@ -319,10 +340,21 @@ export function Step2Panel({
       {/* No results message */}
       {!isScoring && stats && scoredArticles.length === 0 && (
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center space-y-2">
-          <p className="text-sm text-muted-foreground">No relevant signals found in this batch.</p>
-          <p className="text-xs text-muted-foreground/70">
-            All {stats.totalScored} articles were scored below the relevance threshold (min score: {MIN_BD_IMPACT_SCORE}). Try collecting with different keywords.
-          </p>
+          {stats.fromCache === stats.totalScored && (stats.totalScored ?? 0) > 0 ? (
+            <>
+              <p className="text-sm text-foreground font-medium">✅ All {stats.totalScored} articles have already been scored</p>
+              <p className="text-xs text-muted-foreground">
+                Your scored articles are available in <span className="text-primary font-medium">Step 3 — Opportunity Intelligence</span> below. Select articles there for deep-dive analysis.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">No relevant signals found in this batch.</p>
+              <p className="text-xs text-muted-foreground/70">
+                All {stats.totalScored} articles were scored below the relevance threshold (min score: {MIN_BD_IMPACT_SCORE}). Try collecting with different keywords.
+              </p>
+            </>
+          )}
         </div>
       )}
 
