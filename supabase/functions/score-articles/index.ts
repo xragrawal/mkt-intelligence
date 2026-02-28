@@ -36,11 +36,15 @@ DROP these (isRelevant=false):
 - Generic market analysis with no identifiable company
 - Product reviews/updates without deployment/contract/tender/partner action
 - Stock-only or financial commentary articles
+- Duplicate or near-duplicate coverage of the same event/company/deployment — keep only the highest-quality source
+
+IMPORTANT DEDUP RULE:
+If multiple articles cover the SAME company doing the SAME thing (same deployment, contract, partnership, etc.), mark only the BEST one as isRelevant=true (highest source quality). Mark the rest as isRelevant=false with dropReason="Duplicate coverage of same event".
 
 BUYING INTENT TYPES: LIVE_DEPLOYMENT, CONTRACT_AWARD, TENDER, PARTNER_ANNOUNCEMENT, EXPANSION, FUNDING, REGULATION, OTHER
 CONFIDENCE: HIGH, MEDIUM, LOW
 
-You will receive MULTIPLE articles at once. Score each one independently.`;
+You will receive MULTIPLE articles at once. Score each one independently, then deduplicate.`;
 
 const BATCH_SCORING_TOOL = {
   type: "function" as const,
@@ -85,8 +89,7 @@ const BATCH_SCORING_TOOL = {
   },
 };
 
-const BATCH_SIZE = 5;
-const MIN_BD_SCORE = 30;
+const MIN_BD_SCORE = 60;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -94,13 +97,15 @@ serve(async (req) => {
   }
 
   try {
-    const { batchId } = await req.json();
+    const { batchId, minScore } = await req.json();
     if (!batchId) {
       return new Response(JSON.stringify({ error: "batchId required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const scoreThreshold = typeof minScore === "number" ? minScore : MIN_BD_SCORE;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -141,11 +146,16 @@ serve(async (req) => {
 
         const results: Array<{ article: typeof articles[0]; scan: any }> = [];
 
-        // Emit cached results immediately
+        // Emit cached results immediately (only those above threshold)
         let cachedCount = 0;
         for (const [articleId, cachedScore] of cachedMap) {
           const article = articleMap.get(articleId);
           if (!article || !cachedScore.is_relevant) continue;
+          const bdScore = cachedScore.bd_impact_score || 0;
+          if (bdScore < scoreThreshold) {
+            send({ type: "dropped", title: article.title, reason: `Score ${bdScore} below threshold ${scoreThreshold}`, score: bdScore });
+            continue;
+          }
           const scan = {
             isRelevant: cachedScore.is_relevant,
             company: cachedScore.company,
@@ -157,7 +167,7 @@ serve(async (req) => {
             leadClarityScore: cachedScore.lead_clarity_score,
             buyingIntentScore: cachedScore.buying_intent_score,
             sourceQualityScore: cachedScore.source_quality_score,
-            bdImpactScore: cachedScore.bd_impact_score,
+            bdImpactScore: bdScore,
             whyItMatters: cachedScore.why_it_matters,
             confidence: cachedScore.confidence,
           };
@@ -196,115 +206,80 @@ serve(async (req) => {
           send({ type: "progress_note", message: `${preFilteredCount} articles pre-filtered (skipped)` });
         }
 
-        // ── Batch scoring ──
-        const totalBatches = Math.ceil(toScore.length / BATCH_SIZE);
-        let scored = 0;
+        // ── Single LLM call with ALL articles ──
+        if (toScore.length > 0) {
+          send({ type: "progress", current: 0, total: articles.length });
 
-        for (let b = 0; b < totalBatches; b++) {
-          const batch = toScore.slice(b * BATCH_SIZE, (b + 1) * BATCH_SIZE);
-          send({ type: "progress", current: scored + cachedCount + preFilteredCount, total: articles.length });
-
-          const articleList = batch
+          const articleList = toScore
             .map((a, i) => `[${i}] Title: ${a.title}\n    Source: ${a.publishing_agency || "Unknown"}\n    URL: ${a.url}\n    Published: ${a.published_at || "Unknown"}`)
             .join("\n\n");
 
           try {
             const result = await callLLM({
               systemPrompt: SCORING_PROMPT,
-              userMessage: `Score these ${batch.length} articles:\n\n${articleList}`,
+              userMessage: `Score these ${toScore.length} articles. Mark duplicates covering the same event. Only articles with bdImpactScore >= ${scoreThreshold} should be marked isRelevant=true:\n\n${articleList}`,
               tools: [BATCH_SCORING_TOOL],
               toolChoice: { type: "function", function: { name: "score_articles_batch" } },
-              // For scoring, use a cheaper/faster model
-              model: undefined, // uses provider default (claude-sonnet-4 or gemini-3-flash)
+              model: undefined,
             });
 
             if (!result.toolCall) {
-              send({ type: "error", message: `No structured output for batch ${b + 1}` });
-              scored += batch.length;
-              continue;
-            }
+              send({ type: "error", message: "No structured output from LLM" });
+            } else {
+              const { scores } = JSON.parse(result.toolCall.arguments);
 
-            const { scores } = JSON.parse(result.toolCall.arguments);
+              for (const scan of scores) {
+                const idx = scan.articleIndex;
+                if (idx < 0 || idx >= toScore.length) continue;
+                const article = toScore[idx];
 
-            for (const scan of scores) {
-              const idx = scan.articleIndex;
-              if (idx < 0 || idx >= batch.length) continue;
-              const article = batch[idx];
+                // Enforce score threshold
+                if (scan.bdImpactScore < scoreThreshold) {
+                  scan.isRelevant = false;
+                  scan.dropReason = scan.dropReason || `Score ${scan.bdImpactScore} below threshold ${scoreThreshold}`;
+                }
 
-              await supabase.from("scored_articles").upsert({
-                article_id: article.id,
-                batch_id: batchId,
-                is_relevant: scan.isRelevant,
-                drop_reason: scan.dropReason,
-                company: scan.company,
-                partner_or_si: scan.partnerOrSI,
-                country: scan.country,
-                city: scan.city,
-                units_mentioned: scan.unitsMentioned,
-                buying_intent_type: scan.buyingIntentType,
-                lead_clarity_score: scan.leadClarityScore,
-                buying_intent_score: scan.buyingIntentScore,
-                source_quality_score: scan.sourceQualityScore,
-                bd_impact_score: scan.bdImpactScore,
-                why_it_matters: scan.whyItMatters,
-                confidence: scan.confidence,
-              }, { onConflict: "article_id" });
+                await supabase.from("scored_articles").upsert({
+                  article_id: article.id,
+                  batch_id: batchId,
+                  is_relevant: scan.isRelevant,
+                  drop_reason: scan.dropReason,
+                  company: scan.company,
+                  partner_or_si: scan.partnerOrSI,
+                  country: scan.country,
+                  city: scan.city,
+                  units_mentioned: scan.unitsMentioned,
+                  buying_intent_type: scan.buyingIntentType,
+                  lead_clarity_score: scan.leadClarityScore,
+                  buying_intent_score: scan.buyingIntentScore,
+                  source_quality_score: scan.sourceQualityScore,
+                  bd_impact_score: scan.bdImpactScore,
+                  why_it_matters: scan.whyItMatters,
+                  confidence: scan.confidence,
+                }, { onConflict: "article_id" });
 
-              if (scan.isRelevant) {
-                results.push({ article, scan });
-                send({ type: "result", data: { article, scan } });
-              } else {
-                send({ type: "dropped", title: article.title, reason: scan.dropReason || "Scored as not relevant", score: scan.bdImpactScore });
+                if (scan.isRelevant) {
+                  results.push({ article, scan });
+                  send({ type: "result", data: { article, scan } });
+                } else {
+                  send({ type: "dropped", title: article.title, reason: scan.dropReason || "Scored as not relevant", score: scan.bdImpactScore });
+                }
               }
             }
-
-            scored += batch.length;
-            if (b < totalBatches - 1) await new Promise((r) => setTimeout(r, 500));
           } catch (e) {
-            if (e instanceof RateLimitError) {
-              send({ type: "error", message: "Rate limited — waiting before retry" });
-              await new Promise((r) => setTimeout(r, 5000));
-              b--;
-              continue;
-            }
             if (e instanceof CreditsExhaustedError) {
               send({ type: "error", message: e.message });
-              break;
+            } else if (e instanceof RateLimitError) {
+              send({ type: "error", message: "Rate limited by LLM provider" });
+            } else {
+              console.error("Error scoring articles:", e);
+              send({ type: "error", message: `Error: ${e instanceof Error ? e.message : "Unknown"}` });
             }
-            console.error(`Error scoring batch ${b + 1}:`, e);
-            send({ type: "error", message: `Error: ${e instanceof Error ? e.message : "Unknown"}` });
-            scored += batch.length;
           }
         }
 
-        // ── Post-scoring semantic dedup: flag articles about same company+country+intent ──
-        const seen = new Map<string, number>(); // key -> first index
-        const dupIndices = new Set<number>();
-        for (let i = 0; i < results.length; i++) {
-          const r = results[i];
-          const company = (r.scan.company || "").toLowerCase().trim();
-          const country = (r.scan.country || "").toLowerCase().trim();
-          const intent = r.scan.buyingIntentType || "";
-          if (!company) continue;
-          const key = `${company}|${country}|${intent}`;
-          if (seen.has(key)) {
-            dupIndices.add(i);
-          } else {
-            seen.set(key, i);
-          }
-        }
-
-        if (dupIndices.size > 0) {
-          // Mark duplicates — keep first occurrence, flag rest
-          const dedupedResults = results.filter((_, i) => !dupIndices.has(i));
-          const dupResults = results.filter((_, i) => dupIndices.has(i));
-          for (const dup of dupResults) {
-            send({ type: "duplicate_flagged", title: dup.article.title, company: dup.scan.company });
-          }
-          send({ type: "complete", totalScored: articles.length, totalRelevant: dedupedResults.length, fromCache: cachedCount, preFiltered: preFilteredCount, duplicatesRemoved: dupIndices.size });
-        } else {
-          send({ type: "complete", totalScored: articles.length, totalRelevant: results.length, fromCache: cachedCount, preFiltered: preFilteredCount, duplicatesRemoved: 0 });
-        }
+        send({ type: "progress", current: articles.length, total: articles.length });
+        send({ type: "complete", totalScored: articles.length, totalRelevant: results.length, fromCache: cachedCount, preFiltered: preFilteredCount, duplicatesRemoved: 0, scoreThreshold });
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         controller.close();
       },
