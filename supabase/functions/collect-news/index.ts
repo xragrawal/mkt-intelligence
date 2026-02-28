@@ -262,10 +262,7 @@ serve(async (req) => {
         return true;
       });
 
-      const dbDuplicatesSkipped = toStore.length - newArticles.length;
-      if (dbDuplicatesSkipped > 0) {
-        console.log(`Skipped ${dbDuplicatesSkipped} articles already in DB`);
-      }
+      const existingToReassociate = toStore.filter(a => !newArticles.includes(a));
 
       if (newArticles.length > 0) {
         const rows = newArticles.map((a) => ({
@@ -286,9 +283,22 @@ serve(async (req) => {
           console.error("Insert error:", insertError);
         }
       }
+
+      // Re-associate existing articles with the current batch so scoring can find them
+      if (existingToReassociate.length > 0) {
+        const reIds = existingToReassociate.map(a => a.id);
+        const { error: updateError } = await supabase
+          .from("collected_articles")
+          .update({ batch_id: batchId })
+          .in("id", reIds);
+
+        if (updateError) {
+          console.error("Re-associate error:", updateError);
+        }
+      }
     }
 
-    const actualStored = toStore.length > 0 ? (typeof newArticles !== 'undefined' ? newArticles.length : toStore.length) : 0;
+    const actualStored = toStore.length;
 
     const latestPubAt = toStore
       .filter((a) => a.published_at)
