@@ -5,10 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS, SOURCE_LABELS } from "@/lib/types";
-import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion, ArticleSource } from "@/lib/types";
+import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS } from "@/lib/types";
+import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
 import { SourceBadge } from "@/components/signal/SourceBadge";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface Step1PanelProps {
@@ -77,13 +76,31 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
     let lastCompletedRun: CollectionRunSummary | null = null;
 
     try {
-      // Run Google News collection
+      // Run Google News collection (use raw fetch with extended timeout for Global region)
       if (useGoogleNews) {
-        const { data, error: fnError } = await supabase.functions.invoke("collect-news", {
-          body: { keywords, filterDays, region },
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
+        
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collect-news`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ keywords, filterDays, region }),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
-        if (fnError) throw new Error(fnError.message);
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(errText || `HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
+
+        if (data?.error) throw new Error(data.error);
         if (data?.error) throw new Error(data.error);
 
         lastCompletedRun = data.run;
@@ -103,37 +120,51 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
 
       // Run LinkedIn collection
       if (useLinkedIn) {
-        const { data, error: fnError } = await supabase.functions.invoke("collect-linkedin", {
-          body: { keywords, filterDays },
-        });
+        try {
+          const liUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collect-linkedin`;
+          const liResp = await fetch(liUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ keywords, filterDays }),
+          });
 
-        if (fnError) {
-          toast.error("LinkedIn collection failed: " + fnError.message);
-        } else if (data?.error) {
-          toast.error("LinkedIn: " + data.error);
-        } else {
-          // Merge LinkedIn results
-          if (!lastCompletedRun) lastCompletedRun = data.run;
-          else {
-            // Merge run stats
-            lastCompletedRun = {
-              ...lastCompletedRun,
-              articles_collected: lastCompletedRun.articles_collected + (data.run?.articles_collected || 0),
-              articles_stored: lastCompletedRun.articles_stored + (data.run?.articles_stored || 0),
-            };
+          if (!liResp.ok) {
+            const errText = await liResp.text();
+            toast.error("LinkedIn collection failed: " + (errText || `HTTP ${liResp.status}`));
+          } else {
+            const data = await liResp.json();
+            if (data?.error) {
+              toast.error("LinkedIn: " + data.error);
+            } else {
+              // Merge LinkedIn results
+              if (!lastCompletedRun) lastCompletedRun = data.run;
+              else {
+                lastCompletedRun = {
+                  ...lastCompletedRun,
+                  articles_collected: lastCompletedRun.articles_collected + (data.run?.articles_collected || 0),
+                  articles_stored: lastCompletedRun.articles_stored + (data.run?.articles_stored || 0),
+                };
+              }
+              if (data.articles) allStoredArticles.push(...data.articles);
+              if (data.allFetched) allFetchedArticles.push(...data.allFetched);
+              if (data.pipeline) {
+                combinedPipeline.totalFetched += data.pipeline.totalFetched;
+                combinedPipeline.afterDedup += data.pipeline.afterDedup;
+                combinedPipeline.afterDateFilter += data.pipeline.afterDateFilter;
+                combinedPipeline.afterCap += data.pipeline.afterCap;
+                combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
+                combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter || 0;
+                combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
+              }
+              toast.success(`LinkedIn: ${data.run?.articles_stored || 0} articles stored`);
+            }
           }
-          if (data.articles) allStoredArticles.push(...data.articles);
-          if (data.allFetched) allFetchedArticles.push(...data.allFetched);
-          if (data.pipeline) {
-            combinedPipeline.totalFetched += data.pipeline.totalFetched;
-            combinedPipeline.afterDedup += data.pipeline.afterDedup;
-            combinedPipeline.afterDateFilter += data.pipeline.afterDateFilter;
-            combinedPipeline.afterCap += data.pipeline.afterCap;
-            combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
-            combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter || 0;
-            combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
-          }
-          toast.success(`LinkedIn: ${data.run?.articles_stored || 0} articles stored`);
+        } catch (liErr: any) {
+          toast.error("LinkedIn collection failed: " + liErr.message);
         }
       }
 
