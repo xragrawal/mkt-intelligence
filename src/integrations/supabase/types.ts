@@ -22,6 +22,7 @@ export type Database = {
           keyword: string
           published_at: string | null
           publishing_agency: string | null
+          source: string
           title: string
           url: string
         }
@@ -32,6 +33,7 @@ export type Database = {
           keyword: string
           published_at?: string | null
           publishing_agency?: string | null
+          source?: string
           title: string
           url: string
         }
@@ -42,6 +44,7 @@ export type Database = {
           keyword?: string
           published_at?: string | null
           publishing_agency?: string | null
+          source?: string
           title?: string
           url?: string
         }
