@@ -121,6 +121,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
       // Run LinkedIn collection
       if (useLinkedIn) {
         try {
+          const liController = new AbortController();
+          const liTimeoutId = setTimeout(() => liController.abort(), 120000); // 2 min timeout
           const liUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collect-linkedin`;
           const liResp = await fetch(liUrl, {
             method: "POST",
@@ -130,7 +132,9 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
               "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
             body: JSON.stringify({ keywords, filterDays }),
+            signal: liController.signal,
           });
+          clearTimeout(liTimeoutId);
 
           if (!liResp.ok) {
             const errText = await liResp.text();
