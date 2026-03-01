@@ -71,6 +71,10 @@ export default {
           medium: "hsl(var(--confidence-medium))",
           low: "hsl(var(--confidence-low))",
         },
+        source: {
+          gnews: "hsl(var(--source-gnews))",
+          linkedin: "hsl(var(--source-linkedin))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

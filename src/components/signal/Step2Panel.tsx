@@ -3,6 +3,7 @@ import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, Layo
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
+import { SourceBadge } from "@/components/signal/SourceBadge";
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
 import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE } from "@/lib/types";
 import { toast } from "sonner";
@@ -367,6 +368,7 @@ export function Step2Panel({
                 <th className="py-2 pr-2 font-medium w-8"></th>
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
+                <th className="py-2 pr-2 font-medium w-20">Source</th>
                 <th className="py-2 pr-2 font-medium w-24">Company</th>
                 <th className="py-2 pr-2 font-medium w-20">Signal</th>
                 <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
@@ -409,6 +411,9 @@ export function Step2Panel({
                           Open <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
+                    </td>
+                    <td className="py-2.5 pr-2">
+                      <SourceBadge source={sa.article.source || "google_news"} />
                     </td>
                     <td className="py-2.5 pr-2 text-foreground font-medium truncate">{sa.scan.company || "—"}</td>
                     <td className="py-2.5 pr-2">
