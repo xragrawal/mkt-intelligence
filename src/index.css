@@ -56,6 +56,10 @@
     --confidence-medium: 45 90% 55%;
     --confidence-low: 220 10% 50%;
 
+    /* Source colors */
+    --source-gnews: 210 80% 55%;
+    --source-linkedin: 210 90% 45%;
+
     /* Custom */
     --glow-primary: 160 70% 45%;
     --surface-elevated: 220 18% 13%;

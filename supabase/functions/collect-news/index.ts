@@ -326,6 +326,7 @@ serve(async (req) => {
           publishing_agency: a.publishing_agency,
           published_at: a.published_at,
           batch_id: batchId,
+          source: "google_news",
         }));
 
         const { error: insertError } = await supabase
@@ -391,6 +392,7 @@ serve(async (req) => {
           keyword: a.keyword,
           publishing_agency: a.publishing_agency,
           published_at: a.published_at,
+          source: "google_news",
         })),
         allFetched: allArticles.map(a => ({
           id: a.id,
@@ -399,6 +401,7 @@ serve(async (req) => {
           keyword: a.keyword,
           publishing_agency: a.publishing_agency,
           published_at: a.published_at,
+          source: "google_news",
         })),
         pipeline: {
           totalFetched: totalCollected,

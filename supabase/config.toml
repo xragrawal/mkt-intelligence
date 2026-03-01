@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.deep-dive]
 verify_jwt = false
+
+[functions.collect-linkedin]
+verify_jwt = false

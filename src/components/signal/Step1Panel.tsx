@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS } from "@/lib/types";
-import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
+import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS, SOURCE_LABELS } from "@/lib/types";
+import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion, ArticleSource } from "@/lib/types";
+import { SourceBadge } from "@/components/signal/SourceBadge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -28,10 +30,14 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [region, setRegion] = useState<NewsRegion>("Global");
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [storedArticles, setStoredArticles] = useState<CollectedArticle[]>([]);
+  const [storedArticles, setStoredArticles] = useState<(CollectedArticle | FetchedArticleSummary)[]>([]);
   const [allFetched, setAllFetched] = useState<FetchedArticleSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineBreakdown | null>(null);
   const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
+
+  // Source toggles
+  const [useGoogleNews, setUseGoogleNews] = useState(true);
+  const [useLinkedIn, setUseLinkedIn] = useState(false);
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
@@ -50,6 +56,11 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
       toast.error("Add at least one keyword");
       return;
     }
+    if (!useGoogleNews && !useLinkedIn) {
+      toast.error("Enable at least one source");
+      return;
+    }
+
     setIsCollecting(true);
     setError(null);
     setStoredArticles([]);
@@ -57,20 +68,82 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
     setPipeline(null);
     setLastRunInfo(null);
 
+    const allStoredArticles: (CollectedArticle | FetchedArticleSummary)[] = [];
+    const allFetchedArticles: FetchedArticleSummary[] = [];
+    let combinedPipeline: PipelineBreakdown = {
+      totalFetched: 0, afterDedup: 0, afterDateFilter: 0, afterCap: 0,
+      droppedByDedup: 0, droppedByDateFilter: 0, droppedByCap: 0,
+    };
+    let lastCompletedRun: CollectionRunSummary | null = null;
+
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("collect-news", {
-        body: { keywords, filterDays, region },
-      });
+      // Run Google News collection
+      if (useGoogleNews) {
+        const { data, error: fnError } = await supabase.functions.invoke("collect-news", {
+          body: { keywords, filterDays, region },
+        });
 
-      if (fnError) throw new Error(fnError.message);
-      if (data?.error) throw new Error(data.error);
+        if (fnError) throw new Error(fnError.message);
+        if (data?.error) throw new Error(data.error);
 
-      onRunComplete(data.run);
-      if (data.articles) setStoredArticles(data.articles);
-      if (data.allFetched) setAllFetched(data.allFetched);
-      if (data.pipeline) setPipeline(data.pipeline);
-      if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
-      toast.success(`Stored ${data.run.articles_stored} articles (${data.run.articles_collected} fetched)`);
+        lastCompletedRun = data.run;
+        if (data.articles) allStoredArticles.push(...data.articles);
+        if (data.allFetched) allFetchedArticles.push(...data.allFetched);
+        if (data.pipeline) {
+          combinedPipeline.totalFetched += data.pipeline.totalFetched;
+          combinedPipeline.afterDedup += data.pipeline.afterDedup;
+          combinedPipeline.afterDateFilter += data.pipeline.afterDateFilter;
+          combinedPipeline.afterCap += data.pipeline.afterCap;
+          combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
+          combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter;
+          combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
+        }
+        if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
+      }
+
+      // Run LinkedIn collection
+      if (useLinkedIn) {
+        const { data, error: fnError } = await supabase.functions.invoke("collect-linkedin", {
+          body: { keywords, filterDays },
+        });
+
+        if (fnError) {
+          toast.error("LinkedIn collection failed: " + fnError.message);
+        } else if (data?.error) {
+          toast.error("LinkedIn: " + data.error);
+        } else {
+          // Merge LinkedIn results
+          if (!lastCompletedRun) lastCompletedRun = data.run;
+          else {
+            // Merge run stats
+            lastCompletedRun = {
+              ...lastCompletedRun,
+              articles_collected: lastCompletedRun.articles_collected + (data.run?.articles_collected || 0),
+              articles_stored: lastCompletedRun.articles_stored + (data.run?.articles_stored || 0),
+            };
+          }
+          if (data.articles) allStoredArticles.push(...data.articles);
+          if (data.allFetched) allFetchedArticles.push(...data.allFetched);
+          if (data.pipeline) {
+            combinedPipeline.totalFetched += data.pipeline.totalFetched;
+            combinedPipeline.afterDedup += data.pipeline.afterDedup;
+            combinedPipeline.afterDateFilter += data.pipeline.afterDateFilter;
+            combinedPipeline.afterCap += data.pipeline.afterCap;
+            combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
+            combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter || 0;
+            combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
+          }
+          toast.success(`LinkedIn: ${data.run?.articles_stored || 0} articles stored`);
+        }
+      }
+
+      if (lastCompletedRun) {
+        onRunComplete(lastCompletedRun);
+        setStoredArticles(allStoredArticles);
+        setAllFetched(allFetchedArticles);
+        setPipeline(combinedPipeline);
+        toast.success(`Total: ${lastCompletedRun.articles_stored} articles stored (${lastCompletedRun.articles_collected} fetched)`);
+      }
     } catch (e: any) {
       setError(e.message);
       toast.error("Collection failed: " + e.message);
@@ -85,7 +158,28 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm font-display font-bold text-primary">1</div>
         <div>
           <h2 className="text-lg font-display font-semibold text-foreground">News Collection</h2>
-          <p className="text-sm text-muted-foreground">Gather the latest articles from Google News RSS</p>
+          <p className="text-sm text-muted-foreground">Gather the latest articles from your selected sources</p>
+        </div>
+      </div>
+
+      {/* Source toggles */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-muted-foreground">Sources</label>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2.5 cursor-pointer group">
+            <Switch checked={useGoogleNews} onCheckedChange={setUseGoogleNews} />
+            <div className="flex items-center gap-1.5">
+              <Newspaper className="w-4 h-4 text-source-gnews" />
+              <span className={`text-sm ${useGoogleNews ? "text-foreground" : "text-muted-foreground"}`}>Google News</span>
+            </div>
+          </label>
+          <label className="flex items-center gap-2.5 cursor-pointer group">
+            <Switch checked={useLinkedIn} onCheckedChange={setUseLinkedIn} />
+            <div className="flex items-center gap-1.5">
+              <Linkedin className="w-4 h-4 text-source-linkedin" />
+              <span className={`text-sm ${useLinkedIn ? "text-foreground" : "text-muted-foreground"}`}>LinkedIn</span>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -116,7 +210,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         </div>
       </div>
 
-      {/* Date range & region selector */}
+      {/* Date range & region selector — only show region if Google News enabled */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
@@ -132,26 +226,28 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Globe className="w-4 h-4 text-muted-foreground" />
-          <label className="text-sm text-muted-foreground">Region</label>
-          <Select value={region} onValueChange={(v) => setRegion(v as NewsRegion)}>
-            <SelectTrigger className="w-[140px] h-8 text-sm bg-muted border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {NEWS_REGIONS.map((r) => (
-                <SelectItem key={r} value={r}>{r}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {useGoogleNews && (
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-muted-foreground" />
+            <label className="text-sm text-muted-foreground">Region</label>
+            <Select value={region} onValueChange={(v) => setRegion(v as NewsRegion)}>
+              <SelectTrigger className="w-[140px] h-8 text-sm bg-muted border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NEWS_REGIONS.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Last run intelligence */}
         {lastRunInfo && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5">
             <Clock className="w-3.5 h-3.5 shrink-0" />
-            <span>Last run with same keywords:</span>
+            <span>Last run:</span>
             <span className="text-foreground font-medium">
               {new Date(lastRunInfo.completedAt).toLocaleDateString()} {new Date(lastRunInfo.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
@@ -163,7 +259,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
 
       {/* Action */}
       <div className="flex items-center gap-4">
-        <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0} className="gap-2">
+        <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0 || (!useGoogleNews && !useLinkedIn)} className="gap-2">
           {isCollecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Newspaper className="w-4 h-4" />}
           {isCollecting ? "Collecting…" : "Collect Latest News"}
         </Button>
@@ -189,8 +285,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             </div>
 
             <div className="space-y-1.5">
-              <PipelineRow label="Fetched from RSS" value={pipeline.totalFetched} />
-              <PipelineArrow dropped={pipeline.droppedByDedup} reason="duplicates removed (URL + fuzzy title)" />
+              <PipelineRow label="Fetched from sources" value={pipeline.totalFetched} />
+              <PipelineArrow dropped={pipeline.droppedByDedup} reason="duplicates removed" />
               <PipelineRow label="After dedup" value={pipeline.afterDedup} />
               <PipelineArrow dropped={pipeline.droppedByDateFilter} reason={`older than ${filterDays} days`} />
               <PipelineRow label="After date filter" value={pipeline.afterDateFilter} />
@@ -255,7 +351,7 @@ function ArticleTableDialog({
   articles,
 }: {
   label: string;
-  articles: Array<{ id: string; title: string; url: string; keyword: string; publishing_agency?: string | null; published_at?: string | null }>;
+  articles: Array<{ id: string; title: string; url: string; keyword: string; publishing_agency?: string | null; published_at?: string | null; source?: string }>;
 }) {
   return (
     <Dialog>
@@ -275,7 +371,8 @@ function ArticleTableDialog({
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Title</th>
-                <th className="py-2 pr-2 font-medium w-28">Source</th>
+                <th className="py-2 pr-2 font-medium w-20">Source</th>
+                <th className="py-2 pr-2 font-medium w-28">Publisher</th>
                 <th className="py-2 pr-2 font-medium w-20">Keyword</th>
                 <th className="py-2 font-medium w-20">Published</th>
               </tr>
@@ -294,6 +391,13 @@ function ArticleTableDialog({
                       <span className="line-clamp-2">{a.title}</span>
                       <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
                     </a>
+                  </td>
+                  <td className="py-2 pr-2">
+                    {a.source === "linkedin" ? (
+                      <SourceBadge source="linkedin" />
+                    ) : (
+                      <SourceBadge source="google_news" />
+                    )}
                   </td>
                   <td className="py-2 pr-2 text-muted-foreground truncate max-w-[120px]">{a.publishing_agency || "—"}</td>
                   <td className="py-2 pr-2">

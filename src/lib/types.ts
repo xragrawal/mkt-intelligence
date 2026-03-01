@@ -1,3 +1,15 @@
+export type ArticleSource = "google_news" | "linkedin";
+
+export const SOURCE_LABELS: Record<ArticleSource, string> = {
+  google_news: "Google News",
+  linkedin: "LinkedIn",
+};
+
+export const SOURCE_COLORS: Record<ArticleSource, string> = {
+  google_news: "bg-source-gnews/15 text-source-gnews border-source-gnews/30",
+  linkedin: "bg-source-linkedin/15 text-source-linkedin border-source-linkedin/30",
+};
+
 export interface CollectedArticle {
   id: string;
   keyword: string;
@@ -7,6 +19,7 @@ export interface CollectedArticle {
   published_at: string | null;
   created_at: string;
   batch_id: string;
+  source: ArticleSource;
 }
 
 export interface ScoredArticle {
@@ -86,6 +99,7 @@ export interface FetchedArticleSummary {
   keyword: string;
   publishing_agency: string | null;
   published_at: string | null;
+  source?: ArticleSource;
 }
 
 export interface PipelineBreakdown {
