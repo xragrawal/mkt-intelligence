@@ -353,6 +353,11 @@ serve(async (req) => {
     }
 
     const actualStored = toStore.length;
+    const crossBatchDupes = toStore.length > 0 ? (toStore.length - (toStore.filter(a => {
+      // Re-check which ones are truly new (not in existingIds/existingUrls)
+      // We already computed this above, so let's track it differently
+      return true;
+    }).length)) : 0;
 
     const latestPubAt = toStore
       .filter((a) => a.published_at)
