@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
@@ -51,6 +52,7 @@ export function Step2Panel({
   const [showDropped, setShowDropped] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { provider } = useLLMProvider();
 
   const toggleSelect = useCallback(
     (article: ScoredArticle) => {
@@ -82,7 +84,7 @@ export function Step2Panel({
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ batchId: collectionRun.id, minScore: MIN_BD_IMPACT_SCORE }),
+        body: JSON.stringify({ batchId: collectionRun.id, minScore: MIN_BD_IMPACT_SCORE, llmProvider: provider }),
       });
 
       if (!resp.ok) {

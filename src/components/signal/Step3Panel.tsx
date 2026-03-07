@@ -7,6 +7,7 @@ import type { ScoredArticle, OpportunityPack, LeadStatus, BuyingIntentType, Coll
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, SIGNAL_LABELS } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useLLMProvider } from "@/lib/llm-context";
 
 interface Step3PanelProps {
   selectedArticles: ScoredArticle[];
@@ -52,6 +53,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
+  const { provider } = useLLMProvider();
 
   useEffect(() => {
     loadExistingPacks();
@@ -134,10 +136,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             title: sa.article.title,
             source: sa.article.publishing_agency,
             scanContext: sa.scan,
+            llmProvider: provider,
             batchContext: collectionRun ? {
               batchId: collectionRun.id,
               keywords: collectionRun.keywords,
-              filterDays: undefined, // Could be passed from Step 1 config
+              filterDays: undefined,
               collectionRanAt: collectionRun.started_at,
             } : undefined,
           },
