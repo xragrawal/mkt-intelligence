@@ -40,6 +40,18 @@ function titleSimilarity(a: Set<string>, b: Set<string>): number {
   return overlap / Math.min(a.size, b.size);
 }
 
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    // Strip common tracking params
+    const stripParams = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ref", "fbclid", "gclid"];
+    stripParams.forEach(p => u.searchParams.delete(p));
+    return u.origin + u.pathname.replace(/\/+$/, "") + (u.search || "");
+  } catch {
+    return url;
+  }
+}
+
 function getUrlSlug(url: string): string {
   try {
     const u = new URL(url);
