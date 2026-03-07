@@ -55,6 +55,7 @@ interface RSSArticle {
   url: string;
   originalUrl: string;
   title: string;
+  snippet: string | null;
   publishing_agency: string | null;
   published_at: string | null;
 }
