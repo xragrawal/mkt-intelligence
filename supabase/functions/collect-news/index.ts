@@ -291,6 +291,8 @@ serve(async (req) => {
 
     // Store up to MAX_ARTICLES, but first check DB for existing duplicates
     const toStore = filtered.slice(0, MAX_ARTICLES);
+    let newArticlesCount = 0;
+    let crossBatchDupes = 0;
 
     if (toStore.length > 0) {
       // Fetch existing articles to avoid inserting duplicates across runs
@@ -314,6 +316,9 @@ serve(async (req) => {
         }
         return true;
       });
+
+      newArticlesCount = newArticles.length;
+      crossBatchDupes = toStore.length - newArticles.length;
 
       const existingToReassociate = toStore.filter(a => !newArticles.includes(a));
 
@@ -411,6 +416,8 @@ serve(async (req) => {
           droppedByDedup: totalCollected - afterDedup,
           droppedByDateFilter: afterDedup - afterDateFilter,
           droppedByCap: Math.max(0, afterDateFilter - MAX_ARTICLES),
+          crossBatchDupes,
+          newArticles: newArticlesCount,
         },
         lastRunForKeywords: matchingLastRun ? {
           id: matchingLastRun.id,

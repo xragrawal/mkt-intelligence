@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin, Filter, FilterX } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin, Filter, FilterX, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS } from "@/lib/types";
 import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
 import { SourceBadge } from "@/components/signal/SourceBadge";
+import { useLLMProvider, LLM_OPTIONS, type LLMProvider } from "@/lib/llm-context";
 import { toast } from "sonner";
 
 interface Step1PanelProps {
@@ -33,6 +34,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [allFetched, setAllFetched] = useState<FetchedArticleSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineBreakdown | null>(null);
   const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
+  const { provider, setProvider } = useLLMProvider();
 
   // Source toggles
   const [useGoogleNews, setUseGoogleNews] = useState(true);
@@ -72,6 +74,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
     let combinedPipeline: PipelineBreakdown = {
       totalFetched: 0, afterDedup: 0, afterDateFilter: 0, afterCap: 0,
       droppedByDedup: 0, droppedByDateFilter: 0, droppedByCap: 0,
+      crossBatchDupes: 0, newArticles: 0,
     };
     let lastCompletedRun: CollectionRunSummary | null = null;
 
@@ -114,6 +117,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
           combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
           combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter;
           combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
+          combinedPipeline.crossBatchDupes += data.pipeline.crossBatchDupes || 0;
+          combinedPipeline.newArticles += data.pipeline.newArticles || 0;
         }
         if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
       }
@@ -163,6 +168,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
                 combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
                 combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter || 0;
                 combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
+                combinedPipeline.crossBatchDupes += data.pipeline.crossBatchDupes || 0;
+                combinedPipeline.newArticles += data.pipeline.newArticles || 0;
               }
               toast.success(`LinkedIn: ${data.run?.articles_stored || 0} articles stored`);
             }
@@ -245,7 +252,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         </div>
       </div>
 
-      {/* Date range & region selector — only show region if Google News enabled */}
+      {/* Date range, region & LLM selector */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
@@ -277,6 +284,20 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             </Select>
           </div>
         )}
+
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm text-muted-foreground">AI Model</label>
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as LLMProvider)}
+            className="bg-muted border border-border rounded-md px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {LLM_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Last run intelligence */}
         {lastRunInfo && (
@@ -329,6 +350,19 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
                 <PipelineArrow dropped={pipeline.droppedByCap} reason={`capped at ${MAX_ARTICLES_STORED}`} />
               )}
               <PipelineRow label="Stored for scoring" value={pipeline.afterCap} variant="highlight" />
+              {pipeline.crossBatchDupes > 0 && (
+                <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground w-48">Already in DB (prev batches)</span>
+                    <span className="text-signal-funding font-medium tabular-nums">{pipeline.crossBatchDupes}</span>
+                    <span className="text-muted-foreground/60">re-associated</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground w-48">New articles inserted</span>
+                    <span className="text-primary font-bold tabular-nums">{pipeline.newArticles}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {lastRun.articles_stored === 0 && (
