@@ -372,6 +372,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         <span className="text-muted-foreground">—</span>
                       )}
                     </td>
+                    <td className="py-2 px-2 align-top">
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">{intentLabel}</Badge>
                     </td>
                     <td className="py-2 px-2 text-center tabular-nums text-foreground align-top">{units ?? "—"}</td>
