@@ -42,6 +42,7 @@ export function Step2Panel({
   onArticlesScored,
   selectedArticles,
   onSelectionChange,
+  selectedRegions,
 }: Step2PanelProps) {
   const [isScoring, setIsScoring] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
