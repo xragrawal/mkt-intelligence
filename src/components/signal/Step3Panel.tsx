@@ -23,7 +23,7 @@ interface EnrichedResult {
   status: LeadStatus;
   createdAt?: string;
   articleSource?: string | null;
-  // BD context from Step 2 scoring
+  matchedPartner?: { name: string; email: string } | null;
   scanContext?: {
     company?: string | null;
     partnerOrSI?: string | null;
@@ -34,7 +34,6 @@ interface EnrichedResult {
     confidence?: string;
     bdImpactScore?: number;
   };
-  // Batch reference
   batchRef?: {
     batchId?: string;
     keywords?: string[];
