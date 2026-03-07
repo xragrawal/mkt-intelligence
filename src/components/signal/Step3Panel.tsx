@@ -435,7 +435,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             <div key={r.dbId || r.articleUrl} className="relative">
               {/* BD context summary bar */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border rounded-t-xl bg-muted/30 text-xs">
-                {sc?.partnerOrSI && <span className="text-foreground">🤝 {sc.partnerOrSI}</span>}
+                {sc?.partnerOrSI && <span className="text-foreground">🤝 Involved: {sc.partnerOrSI}</span>}
+                {r.matchedPartner && <span className="text-primary font-medium">🏢 FlytBase Partner: {r.matchedPartner.name}</span>}
                 {(sc?.city || sc?.country) && <span className="text-foreground">📍 {[sc?.city, sc?.country].filter(Boolean).join(", ")}</span>}
                 {sc?.unitsMentioned && <span className="text-foreground">📦 {sc.unitsMentioned} units</span>}
                 {sc?.buyingIntentType && (
