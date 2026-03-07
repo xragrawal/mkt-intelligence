@@ -165,6 +165,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             dbId: data.dbId,
             status: "open",
             createdAt: new Date().toISOString(),
+            matchedPartner: data.matchedPartner || null,
             scanContext: {
               company: sa.scan.company,
               partnerOrSI: sa.scan.partnerOrSI,
