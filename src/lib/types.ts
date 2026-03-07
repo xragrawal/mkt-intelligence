@@ -110,6 +110,8 @@ export interface PipelineBreakdown {
   droppedByDedup: number;
   droppedByDateFilter: number;
   droppedByCap: number;
+  crossBatchDupes: number;
+  newArticles: number;
 }
 
 export type LeadStatus = "open" | "shared_with_partners" | "acted_internally" | "closed" | "archived" | "duplicate";
