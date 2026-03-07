@@ -291,6 +291,8 @@ serve(async (req) => {
 
     // Store up to MAX_ARTICLES, but first check DB for existing duplicates
     const toStore = filtered.slice(0, MAX_ARTICLES);
+    let newArticlesCount = 0;
+    let crossBatchDupes = 0;
 
     if (toStore.length > 0) {
       // Fetch existing articles to avoid inserting duplicates across runs
@@ -314,6 +316,9 @@ serve(async (req) => {
         }
         return true;
       });
+
+      newArticlesCount = newArticles.length;
+      crossBatchDupes = toStore.length - newArticles.length;
 
       const existingToReassociate = toStore.filter(a => !newArticles.includes(a));
 
@@ -353,11 +358,6 @@ serve(async (req) => {
     }
 
     const actualStored = toStore.length;
-    const crossBatchDupes = toStore.length > 0 ? (toStore.length - (toStore.filter(a => {
-      // Re-check which ones are truly new (not in existingIds/existingUrls)
-      // We already computed this above, so let's track it differently
-      return true;
-    }).length)) : 0;
 
     const latestPubAt = toStore
       .filter((a) => a.published_at)
