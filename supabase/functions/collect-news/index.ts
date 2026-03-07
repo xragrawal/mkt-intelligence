@@ -334,6 +334,7 @@ serve(async (req) => {
           keyword: a.keyword,
           url: a.url,
           title: a.title,
+          snippet: a.snippet,
           publishing_agency: a.publishing_agency,
           published_at: a.published_at,
           batch_id: batchId,
