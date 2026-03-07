@@ -15,6 +15,8 @@ import { toast } from "sonner";
 interface Step1PanelProps {
   onRunComplete: (run: CollectionRunSummary) => void;
   lastRun: CollectionRunSummary | null;
+  selectedRegions: string[];
+  onRegionsChange: (regions: string[]) => void;
 }
 
 interface LastRunInfo {
@@ -24,11 +26,10 @@ interface LastRunInfo {
   articlesCollected: number;
 }
 
-export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
+export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsChange: setSelectedRegions }: Step1PanelProps) {
   const [keywords, setKeywords] = useState<string[]>(DEFAULT_KEYWORDS);
   const [inputValue, setInputValue] = useState("");
   const [filterDays, setFilterDays] = useState(DEFAULT_FILTER_DAYS);
-  const [selectedRegions, setSelectedRegions] = useState<string[]>(["Global"]);
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<(CollectedArticle | FetchedArticleSummary)[]>([]);
@@ -312,10 +313,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
                             checked={allSelected}
                             className={someSelected && !allSelected ? "opacity-60" : ""}
                             onCheckedChange={(checked) => {
-                              setSelectedRegions(prev => {
-                                const without = prev.filter(r => r !== "Global" && !countries.includes(r));
-                                return checked ? [...without, ...countries] : without;
-                              });
+                              const without = selectedRegions.filter(r => r !== "Global" && !countries.includes(r));
+                              setSelectedRegions(checked ? [...without, ...countries] : without);
                             }}
                           />
                           <span className="text-sm font-semibold text-foreground">{continent}</span>
@@ -326,10 +325,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
                               <Checkbox
                                 checked={selectedRegions.includes(country)}
                                 onCheckedChange={(checked) => {
-                                  setSelectedRegions(prev => {
-                                    const without = prev.filter(r => r !== "Global" && r !== country);
-                                    return checked ? [...without, country] : without;
-                                  });
+                                  const without = selectedRegions.filter(r => r !== "Global" && r !== country);
+                                  setSelectedRegions(checked ? [...without, country] : without);
                                 }}
                               />
                               <span className="text-xs text-foreground">{country}</span>

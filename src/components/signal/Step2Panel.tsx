@@ -1,12 +1,12 @@
-import { useState, useCallback } from "react";
-import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Globe } from "lucide-react";
 import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
 import { SourceBadge } from "@/components/signal/SourceBadge";
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
-import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE } from "@/lib/types";
+import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE, resolveRegionsToCountries, CONTINENT_COUNTRY_MAP } from "@/lib/types";
 import { toast } from "sonner";
 
 interface Step2PanelProps {
@@ -15,6 +15,7 @@ interface Step2PanelProps {
   onArticlesScored: (articles: ScoredArticle[]) => void;
   selectedArticles: ScoredArticle[];
   onSelectionChange: (articles: ScoredArticle[]) => void;
+  selectedRegions: string[];
 }
 
 const ALL_INTENT_TYPES: BuyingIntentType[] = [
@@ -41,6 +42,7 @@ export function Step2Panel({
   onArticlesScored,
   selectedArticles,
   onSelectionChange,
+  selectedRegions,
 }: Step2PanelProps) {
   const [isScoring, setIsScoring] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -52,6 +54,7 @@ export function Step2Panel({
   const [showDropped, setShowDropped] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showRegionFiltered, setShowRegionFiltered] = useState(false);
   const { provider } = useLLMProvider();
 
   const toggleSelect = useCallback(
@@ -174,8 +177,22 @@ export function Step2Panel({
       setIsScoring(false);
     }
   };
+  // Resolve selected regions to country list for post-scoring filter
+  const resolvedCountries = useMemo(() => resolveRegionsToCountries(selectedRegions), [selectedRegions]);
+  const isGlobal = resolvedCountries.includes("Global") || selectedRegions.length === 0;
 
-  const filtered = scoredArticles
+  // Match article country against selected regions (case-insensitive, partial match)
+  const matchesRegion = useCallback((articleCountry: string | null): boolean => {
+    if (isGlobal) return true;
+    if (!articleCountry) return true; // Don't filter out articles with no country extracted
+    const lower = articleCountry.toLowerCase();
+    return resolvedCountries.some(c => lower.includes(c.toLowerCase()) || c.toLowerCase().includes(lower));
+  }, [isGlobal, resolvedCountries]);
+
+  const regionFiltered = scoredArticles.filter(a => !matchesRegion(a.scan.country));
+  const regionPassed = scoredArticles.filter(a => matchesRegion(a.scan.country));
+
+  const filtered = regionPassed
     .filter((a) => !filterType || a.scan.buyingIntentType === filterType)
     .sort((a, b) =>
       sortBy === "score"
@@ -309,6 +326,13 @@ export function Step2Panel({
             <span className="text-muted-foreground">Relevant</span>
             <span className="text-primary font-bold">{stats.totalRelevant}</span>
           </div>
+          {!isGlobal && regionFiltered.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Globe className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Region-filtered</span>
+              <span className="text-destructive font-medium">{regionFiltered.length}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -335,6 +359,37 @@ export function Step2Panel({
                     <p className="text-muted-foreground/70">
                       {d.reason}
                       {d.score !== undefined && <span className="ml-1 font-mono">(score: {d.score})</span>}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Region-filtered articles */}
+      {!isGlobal && regionFiltered.length > 0 && (
+        <div className="rounded-lg bg-muted/30 border border-border">
+          <button
+            onClick={() => setShowRegionFiltered(!showRegionFiltered)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Globe className="w-3.5 h-3.5" />
+              <span>{regionFiltered.length} articles outside selected region ({selectedRegions.join(", ")})</span>
+            </div>
+            <span className="text-[10px]">{showRegionFiltered ? "Hide" : "Show"}</span>
+          </button>
+          {showRegionFiltered && (
+            <div className="px-4 pb-3 space-y-1.5 max-h-48 overflow-y-auto">
+              {regionFiltered.map((rf, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className="text-muted-foreground/60 shrink-0 mt-0.5">🌍</span>
+                  <div className="min-w-0">
+                    <p className="text-foreground/70 line-clamp-1">{rf.article.title}</p>
+                    <p className="text-muted-foreground/70">
+                      Country: {rf.scan.country || "Unknown"} • Score: {rf.scan.bdImpactScore}
                     </p>
                   </div>
                 </div>
