@@ -24,6 +24,7 @@ interface EnrichedResult {
   createdAt?: string;
   articleSource?: string | null;
   matchedPartner?: { name: string; email: string } | null;
+  flytbaseMentioned?: boolean;
   scanContext?: {
     company?: string | null;
     partnerOrSI?: string | null;
