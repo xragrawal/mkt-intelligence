@@ -501,8 +501,12 @@ export function Step2Panel({
                       </div>
                     </td>
                     <td className="py-2.5 pr-2">
-                      <SourceBadge source={sa.article.source || "google_news"} />
+                      <span className="text-foreground text-[10px] leading-tight break-words line-clamp-2" title={sa.scan.useCaseCategory || "—"}>
+                        {sa.scan.useCaseCategory || "—"}
+                      </span>
                     </td>
+                    <td className="py-2.5 pr-2">
+                      <SourceBadge source={sa.article.source || "google_news"} />
                     <td className="py-2.5 pr-2 text-foreground" style={{ maxWidth: 140 }}>
                       {(() => {
                         const parties = [
