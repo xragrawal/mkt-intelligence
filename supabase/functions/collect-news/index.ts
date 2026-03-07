@@ -326,7 +326,7 @@ serve(async (req) => {
         // Skip if same ID already in DB
         if (existingIds.has(a.id)) return false;
         // Skip if same URL already in DB
-        if (existingUrls.has(a.url)) return false;
+        if (existingUrls.has(normalizeUrl(a.url))) return false;
         // Skip if fuzzy title match with existing DB article
         const words = getContentWords(a.title);
         for (const existing of existingContentWords) {
