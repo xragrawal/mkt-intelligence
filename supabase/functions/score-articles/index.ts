@@ -48,10 +48,17 @@ If multiple articles cover the SAME company doing the SAME thing (same deploymen
 INVOLVED PARTIES EXTRACTION RULE:
 - involvedParties MUST list ALL meaningful party names mentioned or inferable from the article: the buyer, deployer, operator, government agency, police department, military branch, contractor, system integrator, service provider, municipality, utility company, etc.
 - Be EXHAUSTIVE: if an article mentions "Bahia Civil Police", "OCA Drones", "City of Salvador" — list ALL of them, not just one.
-- De-prioritize well-known drone manufacturers that are likely search keywords (e.g. "DJI", "Skydio", "Autel") — these are already known context. Only include them if they are acting as a buyer/deployer.
-- Also de-prioritize "FlytBase" itself — it is the user's own company and not a new lead.
-- Prioritize extracting the BUYER, the OPERATOR, the CONTRACTOR, the GOVERNMENT AGENCY, the SYSTEM INTEGRATOR — these are the actionable leads.
+- EXCLUDE "DJI", "Skydio", "Autel", and other well-known drone manufacturers — these are search keywords, NOT actionable leads. Only include them if they are the BUYER/DEPLOYER (not just the product manufacturer).
+- EXCLUDE "FlytBase" — it is the user's own company.
+- Prioritize extracting the BUYER, the OPERATOR, the CONTRACTOR, the GOVERNMENT AGENCY, the SYSTEM INTEGRATOR, the SERVICE PROVIDER, the RESELLER/DEALER — these are the actionable leads.
 - If the article mentions a specific department, division, or named entity within a larger organization, include the specific name (e.g. "Bahia Civil Police" not just "Police").
+- For articles involving drone service providers or resellers (e.g. Heliguy, DroneUp), ALWAYS include them — they are potential FlytBase partners.
+
+POINT OF CONTACT (PoC) EXTRACTION RULE:
+- pocName: Extract the name of any key person mentioned in the article, along with their company/role if available.
+- Format: "Name @ Company" or "Name, Role at Company" (e.g. "Jacob Armstrong @ DGS", "John Smith, CEO at DroneOps")
+- If multiple people are mentioned, pick the most senior/relevant decision-maker.
+- Set to null if no specific person name is mentioned.
 
 BUYING INTENT TYPES: LIVE_DEPLOYMENT, CONTRACT_AWARD, TENDER, PARTNER_ANNOUNCEMENT, EXPANSION, FUNDING, REGULATION, OTHER
 CONFIDENCE: HIGH, MEDIUM, LOW
