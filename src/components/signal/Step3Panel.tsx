@@ -227,11 +227,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   };
 
   const handleDelete = async (result: EnrichedResult) => {
-    if (result.dbId) {
-      await supabase.from("opportunity_packs").delete().eq("id", result.dbId);
-    }
-    setResults((prev) => prev.filter((r) => r.dbId !== result.dbId));
-    toast.success("Opportunity pack removed");
+    await handleStatusChange(result, "deleted");
   };
 
   const handlePartnerChange = async (result: EnrichedResult, partner: PartnerOption | null) => {
