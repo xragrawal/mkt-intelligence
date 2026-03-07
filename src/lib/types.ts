@@ -36,6 +36,7 @@ export interface ArticleScanResult {
   unitsMentioned: number | null;
   involvedParties: string[];
   dealValue: string | null;
+  pocName: string | null;
   buyingIntentType: BuyingIntentType;
   leadClarityScore: number;
   buyingIntentScore: number;
