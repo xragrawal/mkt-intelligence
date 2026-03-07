@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin, Filter, FilterX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
