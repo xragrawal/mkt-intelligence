@@ -211,6 +211,7 @@ serve(async (req) => {
             involvedParties: cachedScore.involved_parties || [],
             dealValue: cachedScore.deal_value || null,
             pocName: cachedScore.poc_name || null,
+            useCaseCategory: cachedScore.use_case_category || null,
             buyingIntentType: cachedScore.buying_intent_type,
             leadClarityScore: cachedScore.lead_clarity_score,
             buyingIntentScore: cachedScore.buying_intent_score,
