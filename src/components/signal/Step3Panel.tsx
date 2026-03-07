@@ -30,6 +30,8 @@ interface EnrichedResult {
     country?: string | null;
     city?: string | null;
     unitsMentioned?: number | null;
+    involvedParties?: string[];
+    dealValue?: string | null;
     buyingIntentType?: string;
     confidence?: string;
     bdImpactScore?: number;
