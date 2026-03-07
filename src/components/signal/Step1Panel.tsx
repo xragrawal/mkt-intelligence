@@ -28,7 +28,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [keywords, setKeywords] = useState<string[]>(DEFAULT_KEYWORDS);
   const [inputValue, setInputValue] = useState("");
   const [filterDays, setFilterDays] = useState(DEFAULT_FILTER_DAYS);
-  const [region, setRegion] = useState<NewsRegion>("Global");
+  const [selectedRegions, setSelectedRegions] = useState<string[]>(["Global"]);
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<(CollectedArticle | FetchedArticleSummary)[]>([]);
