@@ -325,10 +325,8 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
                               <Checkbox
                                 checked={selectedRegions.includes(country)}
                                 onCheckedChange={(checked) => {
-                                  setSelectedRegions(prev => {
-                                    const without = prev.filter(r => r !== "Global" && r !== country);
-                                    return checked ? [...without, country] : without;
-                                  });
+                                  const without = selectedRegions.filter(r => r !== "Global" && r !== country);
+                                  setSelectedRegions(checked ? [...without, country] : without);
                                 }}
                               />
                               <span className="text-xs text-foreground">{country}</span>
