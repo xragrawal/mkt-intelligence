@@ -176,8 +176,22 @@ export function Step2Panel({
       setIsScoring(false);
     }
   };
+  // Resolve selected regions to country list for post-scoring filter
+  const resolvedCountries = useMemo(() => resolveRegionsToCountries(selectedRegions), [selectedRegions]);
+  const isGlobal = resolvedCountries.includes("Global") || selectedRegions.length === 0;
 
-  const filtered = scoredArticles
+  // Match article country against selected regions (case-insensitive, partial match)
+  const matchesRegion = useCallback((articleCountry: string | null): boolean => {
+    if (isGlobal) return true;
+    if (!articleCountry) return true; // Don't filter out articles with no country extracted
+    const lower = articleCountry.toLowerCase();
+    return resolvedCountries.some(c => lower.includes(c.toLowerCase()) || c.toLowerCase().includes(lower));
+  }, [isGlobal, resolvedCountries]);
+
+  const regionFiltered = scoredArticles.filter(a => !matchesRegion(a.scan.country));
+  const regionPassed = scoredArticles.filter(a => matchesRegion(a.scan.country));
+
+  const filtered = regionPassed
     .filter((a) => !filterType || a.scan.buyingIntentType === filterType)
     .sort((a, b) =>
       sortBy === "score"
