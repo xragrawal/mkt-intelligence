@@ -110,6 +110,60 @@ export type Database = {
         }
         Relationships: []
       }
+      market_trends: {
+        Row: {
+          article_id: string
+          article_title: string
+          article_url: string
+          batch_id: string
+          bd_impact_score: number | null
+          buying_intent_type: string | null
+          company: string | null
+          country: string | null
+          flytbase_mentioned: boolean | null
+          id: string
+          notes: string | null
+          tagged_at: string | null
+          tagged_by: string | null
+          use_case_category: string
+          why_it_matters: string | null
+        }
+        Insert: {
+          article_id: string
+          article_title: string
+          article_url: string
+          batch_id: string
+          bd_impact_score?: number | null
+          buying_intent_type?: string | null
+          company?: string | null
+          country?: string | null
+          flytbase_mentioned?: boolean | null
+          id?: string
+          notes?: string | null
+          tagged_at?: string | null
+          tagged_by?: string | null
+          use_case_category: string
+          why_it_matters?: string | null
+        }
+        Update: {
+          article_id?: string
+          article_title?: string
+          article_url?: string
+          batch_id?: string
+          bd_impact_score?: number | null
+          buying_intent_type?: string | null
+          company?: string | null
+          country?: string | null
+          flytbase_mentioned?: boolean | null
+          id?: string
+          notes?: string | null
+          tagged_at?: string | null
+          tagged_by?: string | null
+          use_case_category?: string
+          why_it_matters?: string | null
+        }
+        Relationships: []
+      }
       opportunity_packs: {
         Row: {
           article_source: string | null
@@ -234,6 +288,7 @@ export type Database = {
           poc_name: string | null
           source_quality_score: number | null
           units_mentioned: number | null
+          use_case_category: string | null
           why_it_matters: string | null
         }
         Insert: {
@@ -257,6 +312,7 @@ export type Database = {
           poc_name?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
+          use_case_category?: string | null
           why_it_matters?: string | null
         }
         Update: {
@@ -280,6 +336,7 @@ export type Database = {
           poc_name?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
+          use_case_category?: string | null
           why_it_matters?: string | null
         }
         Relationships: []
