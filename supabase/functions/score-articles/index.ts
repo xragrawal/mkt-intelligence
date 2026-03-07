@@ -285,6 +285,8 @@ serve(async (req) => {
                   country: scan.country,
                   city: scan.city,
                   units_mentioned: scan.unitsMentioned,
+                  involved_parties: scan.involvedParties || null,
+                  deal_value: scan.dealValue || null,
                   buying_intent_type: scan.buyingIntentType,
                   lead_clarity_score: scan.leadClarityScore,
                   buying_intent_score: scan.buyingIntentScore,
