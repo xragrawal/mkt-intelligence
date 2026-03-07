@@ -312,8 +312,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">#</th>
                 <th className="py-2 px-2 font-medium">Batch Ref</th>
                 <th className="py-2 px-2 font-medium">Company</th>
-                <th className="py-2 px-2 font-medium">Partner / SI</th>
+                <th className="py-2 px-2 font-medium">Involved Parties</th>
                 <th className="py-2 px-2 font-medium">Location</th>
+                <th className="py-2 px-2 font-medium">FlytBase Partner</th>
                 <th className="py-2 px-2 font-medium">Signal</th>
                 <th className="py-2 px-2 font-medium text-center">Units</th>
                 <th className="py-2 px-2 font-medium">Conf.</th>
