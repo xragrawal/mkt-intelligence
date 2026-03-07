@@ -404,6 +404,7 @@ export function Step2Panel({
                 <th className="py-2 pr-2 font-medium w-16">Value</th>
                 <th className="py-2 pr-2 font-medium w-20">Signal</th>
                 <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
+                <th className="py-2 pr-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
                 <th className="py-2 font-medium w-8"></th>
               </tr>
             </thead>
@@ -465,6 +466,17 @@ export function Step2Panel({
                     </td>
                     <td className="py-2.5 pr-2 text-center">
                       <span className="font-display font-bold text-primary tabular-nums">{sa.scan.bdImpactScore}</span>
+                    </td>
+                    <td className="py-2.5 pr-2 text-center w-16">
+                      {(() => {
+                        const titleLower = (sa.article.title || "").toLowerCase();
+                        const mentioned = titleLower.includes("flytbase");
+                        return (
+                          <span className={`text-[10px] font-medium ${mentioned ? "text-signal-partner" : "text-muted-foreground"}`}>
+                            {mentioned ? "Yes" : "No"}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-2.5">
                       <button
