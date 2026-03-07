@@ -392,13 +392,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 px-2 font-medium">#</th>
                 <th className="py-2 px-2 font-medium">Batch Ref</th>
-                <th className="py-2 px-2 font-medium">Company</th>
                 <th className="py-2 px-2 font-medium">Involved Parties</th>
+                <th className="py-2 px-2 font-medium">Value</th>
                 <th className="py-2 px-2 font-medium">Location</th>
                 <th className="py-2 px-2 font-medium">FlytBase Partner</th>
-                <th className="py-2 px-2 font-medium" style={{ maxWidth: 70 }}>Signal</th>
-                <th className="py-2 px-2 font-medium text-center">Units</th>
-                <th className="py-2 px-2 font-medium">Value</th>
+                <th className="py-2 px-2 font-medium" style={{ maxWidth: 80 }}>Signal</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
               </tr>
@@ -435,14 +433,27 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         <span className="text-[10px] text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
-                      <div className="font-medium text-foreground break-words leading-tight">{r.pack.companyProfile.companyName}</div>
-                      <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline text-[10px] break-words leading-tight inline-flex items-center gap-0.5 mt-0.5">
-                        <span className="line-clamp-2">{r.articleTitle}</span>
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
-                      </a>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 180 }}>
+                      {(() => {
+                        const companyName = r.pack.companyProfile.companyName;
+                        const parties = [
+                          ...(companyName && companyName !== "Unknown" ? [companyName] : []),
+                          ...(involvedParties || []).filter((p: string) => p !== companyName),
+                          ...(sc?.partnerOrSI && sc.partnerOrSI !== companyName ? [sc.partnerOrSI] : []),
+                        ].filter(Boolean);
+                        const display = parties.length > 0 ? parties.join(", ") : "—";
+                        return (
+                          <div>
+                            <div className="font-medium text-foreground break-words leading-tight line-clamp-2" title={display}>{display}</div>
+                            <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline text-[10px] break-words leading-tight inline-flex items-center gap-0.5 mt-0.5">
+                              <span className="line-clamp-2">{r.articleTitle}</span>
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
+                            </a>
+                          </div>
+                        );
+                      })()}
                     </td>
-                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 120 }} title={partnerDisplay}><span className="line-clamp-2">{partnerDisplay}</span></td>
+                    <td className="py-2 px-2 text-foreground tabular-nums align-top">{dealValue || "—"}</td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
                       {editingPartnerId === (r.dbId || r.articleUrl) ? (
@@ -482,13 +493,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         </div>
                       )}
                     </td>
-                    <td className="py-2 px-2 align-top" style={{ maxWidth: 70 }}>
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-nowrap">{intentLabel}</Badge>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 80 }}>
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">{intentLabel}</Badge>
                     </td>
-                    <td className="py-2 px-2 text-center tabular-nums text-foreground align-top">{units ?? "—"}</td>
-                    <td className="py-2 px-2 text-foreground tabular-nums align-top">{dealValue || "—"}</td>
                     <td className="py-2 px-2 align-top">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-normal leading-tight ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
                     </td>
                     <td className="py-2 px-2 text-right align-top">
                       <div className="flex flex-wrap items-center gap-0.5 justify-end">

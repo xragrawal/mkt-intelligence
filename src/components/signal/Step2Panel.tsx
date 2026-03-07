@@ -371,10 +371,9 @@ export function Step2Panel({
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
                 <th className="py-2 pr-2 font-medium w-20">Source</th>
-                <th className="py-2 pr-2 font-medium w-24">Company</th>
-                <th className="py-2 pr-2 font-medium" style={{ maxWidth: 100 }}>Parties</th>
-                <th className="py-2 pr-2 font-medium w-16">Signal</th>
+                <th className="py-2 pr-2 font-medium" style={{ maxWidth: 140 }}>Involved Parties</th>
                 <th className="py-2 pr-2 font-medium w-16">Value</th>
+                <th className="py-2 pr-2 font-medium w-20">Signal</th>
                 <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
                 <th className="py-2 font-medium w-8"></th>
               </tr>
@@ -418,18 +417,23 @@ export function Step2Panel({
                     <td className="py-2.5 pr-2">
                       <SourceBadge source={sa.article.source || "google_news"} />
                     </td>
-                    <td className="py-2.5 pr-2 text-foreground font-medium truncate">{sa.scan.company || "—"}</td>
-                    <td className="py-2.5 pr-2 text-foreground" style={{ maxWidth: 100 }}>
-                      {sa.scan.involvedParties && sa.scan.involvedParties.length > 0
-                        ? <span className="line-clamp-1" title={sa.scan.involvedParties.join(", ")}>{sa.scan.involvedParties.join(", ")}</span>
-                        : sa.scan.partnerOrSI || "—"}
+                    <td className="py-2.5 pr-2 text-foreground" style={{ maxWidth: 140 }}>
+                      {(() => {
+                        const parties = [
+                          ...(sa.scan.company ? [sa.scan.company] : []),
+                          ...(sa.scan.involvedParties || []).filter(p => p !== sa.scan.company),
+                          ...(sa.scan.partnerOrSI && sa.scan.partnerOrSI !== sa.scan.company ? [sa.scan.partnerOrSI] : []),
+                        ].filter(Boolean);
+                        const display = parties.length > 0 ? parties.join(", ") : "—";
+                        return <span className="line-clamp-2 break-words leading-tight" title={display}>{display}</span>;
+                      })()}
                     </td>
+                    <td className="py-2.5 pr-2 text-foreground tabular-nums">{sa.scan.dealValue || "—"}</td>
                     <td className="py-2.5 pr-2">
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-nowrap">
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">
                         {SIGNAL_LABELS[sa.scan.buyingIntentType]}
                       </Badge>
                     </td>
-                    <td className="py-2.5 pr-2 text-foreground tabular-nums">{sa.scan.dealValue || "—"}</td>
                     <td className="py-2.5 pr-2 text-center">
                       <span className="font-display font-bold text-primary tabular-nums">{sa.scan.bdImpactScore}</span>
                     </td>
