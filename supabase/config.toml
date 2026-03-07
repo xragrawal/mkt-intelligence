@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.collect-linkedin]
 verify_jwt = false
+
+[functions.send-partner-email]
+verify_jwt = false
