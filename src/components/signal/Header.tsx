@@ -1,4 +1,4 @@
-import { Radio, Users } from "lucide-react";
+import { Radio, Users, TrendingUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 export function Header() {
@@ -31,6 +31,17 @@ export function Header() {
           >
             <Users className="w-4 h-4" />
             Partners
+          </Link>
+          <Link
+            to="/trends"
+            className={`flex items-center gap-1.5 text-sm transition-colors ${
+              location.pathname === "/trends"
+                ? "text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Trends
           </Link>
           <span className="text-xs text-muted-foreground font-body">v1.0</span>
         </nav>

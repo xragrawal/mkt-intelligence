@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
-import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Globe, TrendingUp } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -454,6 +455,7 @@ export function Step2Panel({
                 </th>
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
+                <th className="py-2 pr-2 font-medium w-24">Use Case</th>
                 <th className="py-2 pr-2 font-medium w-20">Source</th>
                 <th className="py-2 pr-2 font-medium" style={{ maxWidth: 140 }}>Involved Parties</th>
                 <th className="py-2 pr-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
@@ -498,6 +500,11 @@ export function Step2Panel({
                           Open <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
+                    </td>
+                    <td className="py-2.5 pr-2">
+                      <span className="text-foreground text-[10px] leading-tight break-words line-clamp-2" title={sa.scan.useCaseCategory || "—"}>
+                        {sa.scan.useCaseCategory || "—"}
+                      </span>
                     </td>
                     <td className="py-2.5 pr-2">
                       <SourceBadge source={sa.article.source || "google_news"} />
@@ -554,10 +561,42 @@ export function Step2Panel({
             return (
               <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-xs">
                 <p className="text-foreground">{sa.scan.whyItMatters}</p>
-                <div className="flex flex-wrap gap-3 text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
                   {sa.scan.country && <span>📍 {[sa.scan.city, sa.scan.country].filter(Boolean).join(", ")}</span>}
                   {sa.scan.unitsMentioned && <span>📦 {sa.scan.unitsMentioned} units</span>}
                   {sa.scan.partnerOrSI && <span>🤝 {sa.scan.partnerOrSI}</span>}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] h-6 gap-1 ml-auto"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const titleLower = (sa.article.title || "").toLowerCase();
+                      const fbMentioned = titleLower.includes("flytbase");
+                      const { error } = await supabase.from("market_trends").upsert({
+                        article_id: sa.article.id,
+                        batch_id: sa.article.batch_id,
+                        use_case_category: sa.scan.useCaseCategory || "Uncategorized",
+                        article_title: sa.article.title,
+                        article_url: sa.article.url,
+                        company: sa.scan.company,
+                        country: sa.scan.country,
+                        bd_impact_score: sa.scan.bdImpactScore,
+                        buying_intent_type: sa.scan.buyingIntentType,
+                        why_it_matters: sa.scan.whyItMatters,
+                        flytbase_mentioned: fbMentioned,
+                      }, { onConflict: "article_id" });
+                      if (error) {
+                        toast.error("Failed to tag trend");
+                        console.error(error);
+                      } else {
+                        toast.success(`Tagged as "${sa.scan.useCaseCategory || "Uncategorized"}"`);
+                      }
+                    }}
+                  >
+                    <TrendingUp className="w-3 h-3" />
+                    Tag as Trend
+                  </Button>
                 </div>
               </div>
             );
