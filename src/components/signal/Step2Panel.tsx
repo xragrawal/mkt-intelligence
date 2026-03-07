@@ -507,6 +507,7 @@ export function Step2Panel({
                     </td>
                     <td className="py-2.5 pr-2">
                       <SourceBadge source={sa.article.source || "google_news"} />
+                    </td>
                     <td className="py-2.5 pr-2 text-foreground" style={{ maxWidth: 140 }}>
                       {(() => {
                         const parties = [
