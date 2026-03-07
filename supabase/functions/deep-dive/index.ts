@@ -74,7 +74,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, title, source, scanContext, batchContext } = await req.json();
+    const { url, title, source, scanContext, batchContext, llmProvider } = await req.json();
     if (!url || !title) {
       return new Response(JSON.stringify({ error: "url and title required" }), {
         status: 400,
