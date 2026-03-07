@@ -1,4 +1,4 @@
-import { Radio, Users } from "lucide-react";
+import { Radio, Users, TrendingUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 export function Header() {
