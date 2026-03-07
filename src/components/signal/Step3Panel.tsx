@@ -414,23 +414,15 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                   return (
                   <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
                     <td className="py-2 px-2 text-muted-foreground tabular-nums align-top">{i + 1}</td>
-                    <td className="py-2 px-2 align-top" style={{ maxWidth: 120 }}>
-                      {r.batchRef?.keywords ? (
-                        <div className="space-y-0.5">
-                          <div className="text-[10px] text-foreground font-medium truncate" title={r.batchRef.keywords.join(", ")}>
-                            {r.batchRef.keywords.join(", ")}
-                          </div>
-                          {r.batchRef.collectionRanAt && (
-                            <div className="text-[10px] text-muted-foreground">
-                              {new Date(r.batchRef.collectionRanAt).toLocaleDateString()}
-                            </div>
-                          )}
-                          {r.batchRef.filterDays && (
-                            <div className="text-[10px] text-muted-foreground">{r.batchRef.filterDays}d window</div>
-                          )}
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
+                      <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary hover:underline text-[11px] break-words leading-tight inline-flex items-start gap-0.5">
+                        <span className="line-clamp-2">{r.articleTitle}</span>
+                        <ExternalLink className="w-2.5 h-2.5 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 text-primary" />
+                      </a>
+                      {r.batchRef?.keywords && (
+                        <div className="text-[9px] text-muted-foreground mt-0.5 truncate" title={r.batchRef.keywords.join(", ")}>
+                          🔑 {r.batchRef.keywords.join(", ")}
                         </div>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 180 }}>
