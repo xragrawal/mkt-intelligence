@@ -15,6 +15,8 @@ import { toast } from "sonner";
 interface Step1PanelProps {
   onRunComplete: (run: CollectionRunSummary) => void;
   lastRun: CollectionRunSummary | null;
+  selectedRegions: string[];
+  onRegionsChange: (regions: string[]) => void;
 }
 
 interface LastRunInfo {
@@ -24,11 +26,10 @@ interface LastRunInfo {
   articlesCollected: number;
 }
 
-export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
+export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsChange: setSelectedRegions }: Step1PanelProps) {
   const [keywords, setKeywords] = useState<string[]>(DEFAULT_KEYWORDS);
   const [inputValue, setInputValue] = useState("");
   const [filterDays, setFilterDays] = useState(DEFAULT_FILTER_DAYS);
-  const [selectedRegions, setSelectedRegions] = useState<string[]>(["Global"]);
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<(CollectedArticle | FetchedArticleSummary)[]>([]);

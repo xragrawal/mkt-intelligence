@@ -11,13 +11,19 @@ const Index = () => {
   const [scoredArticles, setScoredArticles] = useState<ScoredArticle[]>([]);
   const [selectedArticles, setSelectedArticles] = useState<ScoredArticle[]>([]);
   const [step2Done, setStep2Done] = useState(false);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>(["Global"]);
 
   return (
     <LLMProviderProvider>
       <div className="min-h-screen bg-background">
         <Header />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-          <Step1Panel onRunComplete={setCollectionRun} lastRun={collectionRun} />
+          <Step1Panel
+            onRunComplete={setCollectionRun}
+            lastRun={collectionRun}
+            selectedRegions={selectedRegions}
+            onRegionsChange={setSelectedRegions}
+          />
           <Step2Panel
             collectionRun={collectionRun}
             scoredArticles={scoredArticles}
@@ -27,6 +33,7 @@ const Index = () => {
             }}
             selectedArticles={selectedArticles}
             onSelectionChange={setSelectedArticles}
+            selectedRegions={selectedRegions}
           />
           <Step3Panel
             selectedArticles={selectedArticles}

@@ -1,12 +1,12 @@
-import { useState, useCallback } from "react";
-import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Globe } from "lucide-react";
 import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
 import { SourceBadge } from "@/components/signal/SourceBadge";
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
-import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE } from "@/lib/types";
+import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE, resolveRegionsToCountries, CONTINENT_COUNTRY_MAP } from "@/lib/types";
 import { toast } from "sonner";
 
 interface Step2PanelProps {
@@ -15,6 +15,7 @@ interface Step2PanelProps {
   onArticlesScored: (articles: ScoredArticle[]) => void;
   selectedArticles: ScoredArticle[];
   onSelectionChange: (articles: ScoredArticle[]) => void;
+  selectedRegions: string[];
 }
 
 const ALL_INTENT_TYPES: BuyingIntentType[] = [
