@@ -313,10 +313,8 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
                             checked={allSelected}
                             className={someSelected && !allSelected ? "opacity-60" : ""}
                             onCheckedChange={(checked) => {
-                              setSelectedRegions(prev => {
-                                const without = prev.filter(r => r !== "Global" && !countries.includes(r));
-                                return checked ? [...without, ...countries] : without;
-                              });
+                              const without = selectedRegions.filter(r => r !== "Global" && !countries.includes(r));
+                              setSelectedRegions(checked ? [...without, ...countries] : without);
                             }}
                           />
                           <span className="text-sm font-semibold text-foreground">{continent}</span>
