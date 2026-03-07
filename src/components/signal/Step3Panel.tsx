@@ -7,6 +7,7 @@ import type { ScoredArticle, OpportunityPack, LeadStatus, BuyingIntentType, Coll
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, SIGNAL_LABELS } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useLLMProvider } from "@/lib/llm-context";
 
 interface Step3PanelProps {
   selectedArticles: ScoredArticle[];
