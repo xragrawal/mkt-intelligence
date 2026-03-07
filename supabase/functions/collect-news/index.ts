@@ -116,6 +116,10 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
       
       const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || null;
       const source = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || null;
+      const description = itemXml.match(/<description>([\s\S]*?)<\/description>/)?.[1]
+        ?.replace(/<!\[CDATA\[|\]\]>/g, "")
+        ?.replace(/<[^>]+>/g, "")
+        ?.trim() || null;
 
       if (title && link) {
         const idSource = `${normalizeTitle(title)}|${source || ""}`;
@@ -125,6 +129,7 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
           url: link,
           originalUrl: link,
           title,
+          snippet: description ? description.slice(0, 500) : null,
           publishing_agency: source,
           published_at: pubDate ? new Date(pubDate).toISOString() : null,
         });
