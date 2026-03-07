@@ -18,6 +18,7 @@ RULES:
 - Set values to null if not explicitly supported by the article
 - opportunityScore 0-100; score higher when scale/expansion is implied
 - ALL output text MUST be in English. If the source article is in another language, translate all content to English.
+- FLYTBASE MENTION CHECK: Determine if "FlytBase" (case-insensitive) is mentioned anywhere in the article title or context. Set flytbaseMentioned=true if so. This helps the BD team avoid redundant outreach to companies already working with FlytBase.
 
 The output must be a structured Opportunity Intelligence Pack.`;
 
