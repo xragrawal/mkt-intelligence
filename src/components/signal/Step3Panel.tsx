@@ -481,11 +481,6 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         </div>
                       )}
                     </td>
-                    <td className="py-2 px-2 text-center align-top w-16">
-                      <span className={`text-[10px] font-medium ${r.flytbaseMentioned ? "text-signal-partner" : "text-muted-foreground"}`}>
-                        {r.flytbaseMentioned ? "Yes" : "No"}
-                      </span>
-                    </td>
                     <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-normal leading-tight ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
                     </td>
