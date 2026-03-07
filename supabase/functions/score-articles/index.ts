@@ -100,7 +100,7 @@ serve(async (req) => {
   }
 
   try {
-    const { batchId, minScore } = await req.json();
+    const { batchId, minScore, llmProvider } = await req.json();
     if (!batchId) {
       return new Response(JSON.stringify({ error: "batchId required" }), {
         status: 400,
