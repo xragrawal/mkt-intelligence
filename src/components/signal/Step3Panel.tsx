@@ -53,6 +53,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
+  const { provider } = useLLMProvider();
 
   useEffect(() => {
     loadExistingPacks();
