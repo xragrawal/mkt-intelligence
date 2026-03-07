@@ -561,10 +561,42 @@ export function Step2Panel({
             return (
               <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2 text-xs">
                 <p className="text-foreground">{sa.scan.whyItMatters}</p>
-                <div className="flex flex-wrap gap-3 text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
                   {sa.scan.country && <span>📍 {[sa.scan.city, sa.scan.country].filter(Boolean).join(", ")}</span>}
                   {sa.scan.unitsMentioned && <span>📦 {sa.scan.unitsMentioned} units</span>}
                   {sa.scan.partnerOrSI && <span>🤝 {sa.scan.partnerOrSI}</span>}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] h-6 gap-1 ml-auto"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const titleLower = (sa.article.title || "").toLowerCase();
+                      const fbMentioned = titleLower.includes("flytbase");
+                      const { error } = await supabase.from("market_trends").upsert({
+                        article_id: sa.article.id,
+                        batch_id: sa.article.batch_id,
+                        use_case_category: sa.scan.useCaseCategory || "Uncategorized",
+                        article_title: sa.article.title,
+                        article_url: sa.article.url,
+                        company: sa.scan.company,
+                        country: sa.scan.country,
+                        bd_impact_score: sa.scan.bdImpactScore,
+                        buying_intent_type: sa.scan.buyingIntentType,
+                        why_it_matters: sa.scan.whyItMatters,
+                        flytbase_mentioned: fbMentioned,
+                      }, { onConflict: "article_id" });
+                      if (error) {
+                        toast.error("Failed to tag trend");
+                        console.error(error);
+                      } else {
+                        toast.success(`Tagged as "${sa.scan.useCaseCategory || "Uncategorized"}"`);
+                      }
+                    }}
+                  >
+                    <TrendingUp className="w-3 h-3" />
+                    Tag as Trend
+                  </Button>
                 </div>
               </div>
             );
