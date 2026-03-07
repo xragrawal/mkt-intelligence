@@ -72,6 +72,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
     let combinedPipeline: PipelineBreakdown = {
       totalFetched: 0, afterDedup: 0, afterDateFilter: 0, afterCap: 0,
       droppedByDedup: 0, droppedByDateFilter: 0, droppedByCap: 0,
+      crossBatchDupes: 0, newArticles: 0,
     };
     let lastCompletedRun: CollectionRunSummary | null = null;
 
