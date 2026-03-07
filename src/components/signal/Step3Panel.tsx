@@ -431,9 +431,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                             <Briefcase className="w-3 h-3" /> CRM
                           </Button>
                         )}
-                        {r.status !== "shared_with_partners" && (
+                         {r.status !== "shared_with_partners" && (
                           <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
                             <Users className="w-3 h-3" /> Partner
+                          </Button>
+                        )}
+                        {r.matchedPartner && (
+                          <Button variant="ghost" size="sm" onClick={() => handleSendToPartner(r)} disabled={sendingEmailFor === (r.dbId || r.articleUrl)} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary">
+                            {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email
                           </Button>
                         )}
                         {r.status !== "duplicate" && (
