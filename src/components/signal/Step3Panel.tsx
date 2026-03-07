@@ -439,14 +439,42 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                     </td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 100 }}>{partner}</td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
-                    <td className="py-2 px-2 align-top" style={{ maxWidth: 120 }}>
-                      {r.matchedPartner ? (
-                        <div className="space-y-0.5">
-                          <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
-                          <a href={`mailto:${r.matchedPartner.email}`} className="text-[10px] text-primary hover:underline">{r.matchedPartner.email}</a>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
+                      {editingPartnerId === (r.dbId || r.articleUrl) ? (
+                        <div className="space-y-1">
+                          <select
+                            className="w-full text-[11px] bg-background border border-border rounded px-1 py-0.5 text-foreground"
+                            defaultValue={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
+                            onChange={(e) => {
+                              const selected = allPartners.find(p => p.id === e.target.value);
+                              handlePartnerChange(r, selected || null);
+                            }}
+                          >
+                            <option value="">— None —</option>
+                            {allPartners.map(p => (
+                              <option key={p.id} value={p.id}>{p.name} ({p.region})</option>
+                            ))}
+                          </select>
+                          <button onClick={() => setEditingPartnerId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <div className="flex items-start gap-1 group/partner">
+                          {r.matchedPartner ? (
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
+                              <a href={`mailto:${r.matchedPartner.email}`} className="text-[10px] text-primary hover:underline">{r.matchedPartner.email}</a>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-[11px]">—</span>
+                          )}
+                          <button
+                            onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)}
+                            className="opacity-0 group-hover/partner:opacity-100 p-0.5 text-muted-foreground hover:text-primary transition-opacity shrink-0 mt-0.5"
+                            title="Change partner"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       )}
                     </td>
                     <td className="py-2 px-2 align-top">
