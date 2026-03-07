@@ -401,10 +401,10 @@ export function Step2Panel({
                 <th className="py-2 pr-2 font-medium">Article</th>
                 <th className="py-2 pr-2 font-medium w-20">Source</th>
                 <th className="py-2 pr-2 font-medium" style={{ maxWidth: 140 }}>Involved Parties</th>
+                <th className="py-2 pr-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
                 <th className="py-2 pr-2 font-medium w-16">Value</th>
                 <th className="py-2 pr-2 font-medium w-20">Signal</th>
                 <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
-                <th className="py-2 pr-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
                 <th className="py-2 font-medium w-8"></th>
               </tr>
             </thead>
@@ -458,15 +458,6 @@ export function Step2Panel({
                         return <span className="line-clamp-2 break-words leading-tight" title={display}>{display}</span>;
                       })()}
                     </td>
-                    <td className="py-2.5 pr-2 text-foreground tabular-nums">{sa.scan.dealValue || "—"}</td>
-                    <td className="py-2.5 pr-2">
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">
-                        {SIGNAL_LABELS[sa.scan.buyingIntentType]}
-                      </Badge>
-                    </td>
-                    <td className="py-2.5 pr-2 text-center">
-                      <span className="font-display font-bold text-primary tabular-nums">{sa.scan.bdImpactScore}</span>
-                    </td>
                     <td className="py-2.5 pr-2 text-center w-16">
                       {(() => {
                         const titleLower = (sa.article.title || "").toLowerCase();
@@ -477,6 +468,15 @@ export function Step2Panel({
                           </span>
                         );
                       })()}
+                    </td>
+                    <td className="py-2.5 pr-2 text-foreground tabular-nums">{sa.scan.dealValue || "—"}</td>
+                    <td className="py-2.5 pr-2">
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">
+                        {SIGNAL_LABELS[sa.scan.buyingIntentType]}
+                      </Badge>
+                    </td>
+                    <td className="py-2.5 pr-2 text-center">
+                      <span className="font-display font-bold text-primary tabular-nums">{sa.scan.bdImpactScore}</span>
                     </td>
                     <td className="py-2.5">
                       <button
