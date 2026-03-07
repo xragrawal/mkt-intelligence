@@ -42,6 +42,13 @@ interface EnrichedResult {
   };
 }
 
+interface PartnerOption {
+  id: string;
+  name: string;
+  email: string;
+  region: string;
+}
+
 const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
 
 export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3PanelProps) {
@@ -52,11 +59,19 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
+  const [allPartners, setAllPartners] = useState<PartnerOption[]>([]);
+  const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
   const { provider } = useLLMProvider();
 
   useEffect(() => {
     loadExistingPacks();
+    loadAllPartners();
   }, []);
+
+  const loadAllPartners = async () => {
+    const { data } = await supabase.from("flytbase_partners").select("id, name, email, region").order("name");
+    if (data) setAllPartners(data);
+  };
 
   const loadExistingPacks = async () => {
     setIsLoadingExisting(true);
