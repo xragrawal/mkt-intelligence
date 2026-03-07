@@ -454,6 +454,7 @@ export function Step2Panel({
                 </th>
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
+                <th className="py-2 pr-2 font-medium w-24">Use Case</th>
                 <th className="py-2 pr-2 font-medium w-20">Source</th>
                 <th className="py-2 pr-2 font-medium" style={{ maxWidth: 140 }}>Involved Parties</th>
                 <th className="py-2 pr-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
