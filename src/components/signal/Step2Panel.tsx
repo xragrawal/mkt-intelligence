@@ -202,7 +202,23 @@ export function Step2Panel({
           </div>
         </div>
         {scoredArticles.length > 0 && (
-          <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7"
+              onClick={() => {
+                if (selectedArticles.length === filtered.length) {
+                  onSelectionChange([]);
+                } else {
+                  onSelectionChange([...filtered]);
+                }
+              }}
+            >
+              {selectedArticles.length === filtered.length ? "Deselect All" : "Select All"}
+            </Button>
+            <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
+          </div>
         )}
       </div>
 
