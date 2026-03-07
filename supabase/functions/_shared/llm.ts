@@ -27,11 +27,33 @@ function getProvider(): LLMProvider {
 
 // ── Gemini Direct (Google AI Studio / Generative Language API) ──
 
+/** Recursively sanitize a JSON Schema for Gemini's API:
+ *  - Convert `"type": ["string", "null"]` → `"type": "string", "nullable": true`
+ *  - Remove `additionalProperties` (unsupported)
+ */
+function sanitizeSchemaForGemini(obj: any): any {
+  if (obj === null || obj === undefined || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeSchemaForGemini);
+
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === "additionalProperties") continue;
+    if (key === "type" && Array.isArray(value)) {
+      const types = (value as string[]).filter(t => t !== "null");
+      result.type = types.length === 1 ? types[0] : types[0] || "string";
+      if ((value as string[]).includes("null")) result.nullable = true;
+    } else {
+      result[key] = sanitizeSchemaForGemini(value);
+    }
+  }
+  return result;
+}
+
 function convertToolsToGeminiDirect(tools: any[]): any[] {
   return tools.map((t) => ({
     name: t.function.name,
     description: t.function.description,
-    parameters: t.function.parameters,
+    parameters: sanitizeSchemaForGemini(t.function.parameters),
   }));
 }
 
