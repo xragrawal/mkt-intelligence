@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin, Filter, FilterX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -351,6 +351,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             <ArticleTableDialog
               label={`${allFetched.length} total fetched articles (before filters)`}
               articles={allFetched}
+              showFunnelFilters
+              filterDays={filterDays}
             />
           )}
         </div>
@@ -381,13 +383,107 @@ function PipelineArrow({ dropped, reason }: { dropped: number; reason: string })
   );
 }
 
+// --- Client-side dedup helpers (mirror backend logic) ---
+const STOP_WORDS = new Set(["the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her", "was", "one", "our", "out", "has", "its", "how", "who", "what", "when", "where", "why", "with", "from", "they", "been", "have", "will", "this", "that", "than", "then", "into", "over", "also", "new", "more"]);
+
+function normalizeTitle(title: string): string {
+  return title.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function getContentWords(title: string): Set<string> {
+  return new Set(normalizeTitle(title).split(" ").filter(w => w.length >= 3 && !STOP_WORDS.has(w)));
+}
+
+function titleSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let overlap = 0;
+  for (const w of a) { if (b.has(w)) overlap++; }
+  return overlap / Math.min(a.size, b.size);
+}
+
+function getUrlSlug(url: string): string {
+  try { return new URL(url).pathname.toLowerCase().replace(/\/+/g, "/").replace(/\/$/, ""); }
+  catch { return url; }
+}
+
+type ArticleRow = { id: string; title: string; url: string; keyword: string; publishing_agency?: string | null; published_at?: string | null; source?: string };
+
+function clientDedup(articles: ArticleRow[]): { kept: Set<string>; removed: number } {
+  const kept = new Set<string>();
+  const seenUrls = new Set<string>();
+  const seenTitles = new Set<string>();
+  const seenSlugs = new Set<string>();
+  const seenAgencyTime = new Set<string>();
+  const seenContentWords: Array<{ words: Set<string> }> = [];
+
+  for (const a of articles) {
+    if (seenUrls.has(a.url)) continue;
+    const normTitle = normalizeTitle(a.title);
+    if (seenTitles.has(normTitle)) continue;
+    if (a.publishing_agency && a.published_at) {
+      const key = `${a.publishing_agency}|${a.published_at}`;
+      if (seenAgencyTime.has(key)) continue;
+      seenAgencyTime.add(key);
+    }
+    const slug = getUrlSlug(a.url);
+    if (seenSlugs.has(slug)) continue;
+    const words = getContentWords(a.title);
+    let isDup = false;
+    for (const existing of seenContentWords) {
+      if (titleSimilarity(words, existing.words) >= 0.8) { isDup = true; break; }
+    }
+    if (isDup) continue;
+
+    kept.add(a.id);
+    seenUrls.add(a.url);
+    seenTitles.add(normTitle);
+    seenSlugs.add(slug);
+    seenContentWords.push({ words });
+  }
+
+  return { kept, removed: articles.length - kept.size };
+}
+
 function ArticleTableDialog({
   label,
   articles,
+  showFunnelFilters = false,
+  filterDays = 30,
 }: {
   label: string;
-  articles: Array<{ id: string; title: string; url: string; keyword: string; publishing_agency?: string | null; published_at?: string | null; source?: string }>;
+  articles: ArticleRow[];
+  showFunnelFilters?: boolean;
+  filterDays?: number;
 }) {
+  const [dedupEnabled, setDedupEnabled] = useState(false);
+  const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
+
+  const dedupResult = useMemo(() => clientDedup(articles), [articles]);
+
+  const filteredArticles = useMemo(() => {
+    let result = articles;
+
+    if (dedupEnabled) {
+      result = result.filter(a => dedupResult.kept.has(a.id));
+    }
+
+    if (dateFilterEnabled) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - filterDays);
+      result = result.filter(a => {
+        if (!a.published_at) return true;
+        return new Date(a.published_at) >= cutoff;
+      });
+    }
+
+    return result;
+  }, [articles, dedupEnabled, dateFilterEnabled, dedupResult, filterDays]);
+
+  const dedupCount = dedupResult.removed;
+  const dateDropped = dedupEnabled
+    ? articles.filter(a => dedupResult.kept.has(a.id)).length - articles.filter(a => dedupResult.kept.has(a.id) && (!a.published_at || new Date(a.published_at) >= (() => { const d = new Date(); d.setDate(d.getDate() - filterDays); return d; })())).length
+    : articles.length - articles.filter(a => !a.published_at || new Date(a.published_at) >= (() => { const d = new Date(); d.setDate(d.getDate() - filterDays); return d; })()).length;
+
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -398,8 +494,56 @@ function ArticleTableDialog({
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-base font-display">{label}</DialogTitle>
+          <DialogTitle className="text-base font-display">
+            {showFunnelFilters ? `${filteredArticles.length} of ${articles.length} articles` : label}
+          </DialogTitle>
         </DialogHeader>
+
+        {showFunnelFilters && (
+          <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-border">
+            <span className="text-xs text-muted-foreground mr-1">Funnel filters:</span>
+            <Button
+              variant={dedupEnabled ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5 text-xs h-7 px-2.5"
+              onClick={() => setDedupEnabled(!dedupEnabled)}
+            >
+              {dedupEnabled ? <FilterX className="w-3 h-3" /> : <Filter className="w-3 h-3" />}
+              Dedup
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-0.5 font-mono">
+                −{dedupCount}
+              </Badge>
+            </Button>
+            <Button
+              variant={dateFilterEnabled ? "default" : "outline"}
+              size="sm"
+              className="gap-1.5 text-xs h-7 px-2.5"
+              onClick={() => setDateFilterEnabled(!dateFilterEnabled)}
+            >
+              {dateFilterEnabled ? <FilterX className="w-3 h-3" /> : <Filter className="w-3 h-3" />}
+              ≤ {filterDays} days
+              <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-0.5 font-mono">
+                −{dateDropped}
+              </Badge>
+            </Button>
+
+            {(dedupEnabled || dateFilterEnabled) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 px-2 text-muted-foreground"
+                onClick={() => { setDedupEnabled(false); setDateFilterEnabled(false); }}
+              >
+                Clear all
+              </Button>
+            )}
+
+            <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+              Showing <span className="text-foreground font-medium">{filteredArticles.length}</span> of {articles.length}
+            </span>
+          </div>
+        )}
+
         <div className="overflow-auto flex-1 -mx-6 px-6">
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 bg-card z-10">
@@ -413,7 +557,7 @@ function ArticleTableDialog({
               </tr>
             </thead>
             <tbody>
-              {articles.map((a, i) => (
+              {filteredArticles.map((a, i) => (
                 <tr key={a.id + i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                   <td className="py-2 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
                   <td className="py-2 pr-2 text-foreground leading-snug">
@@ -428,11 +572,7 @@ function ArticleTableDialog({
                     </a>
                   </td>
                   <td className="py-2 pr-2">
-                    {a.source === "linkedin" ? (
-                      <SourceBadge source="linkedin" />
-                    ) : (
-                      <SourceBadge source="google_news" />
-                    )}
+                    {a.source === "linkedin" ? <SourceBadge source="linkedin" /> : <SourceBadge source="google_news" />}
                   </td>
                   <td className="py-2 pr-2 text-muted-foreground truncate max-w-[120px]">{a.publishing_agency || "—"}</td>
                   <td className="py-2 pr-2">
