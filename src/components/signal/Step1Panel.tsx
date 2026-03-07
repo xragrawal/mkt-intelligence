@@ -351,6 +351,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             <ArticleTableDialog
               label={`${allFetched.length} total fetched articles (before filters)`}
               articles={allFetched}
+              showFunnelFilters
+              filterDays={filterDays}
             />
           )}
         </div>
