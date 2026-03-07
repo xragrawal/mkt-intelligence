@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Mail } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Mail, Edit2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
@@ -42,6 +42,13 @@ interface EnrichedResult {
   };
 }
 
+interface PartnerOption {
+  id: string;
+  name: string;
+  email: string;
+  region: string;
+}
+
 const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
 
 export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3PanelProps) {
@@ -52,11 +59,19 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
+  const [allPartners, setAllPartners] = useState<PartnerOption[]>([]);
+  const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
   const { provider } = useLLMProvider();
 
   useEffect(() => {
     loadExistingPacks();
+    loadAllPartners();
   }, []);
+
+  const loadAllPartners = async () => {
+    const { data } = await supabase.from("flytbase_partners").select("id, name, email, region").order("name");
+    if (data) setAllPartners(data);
+  };
 
   const loadExistingPacks = async () => {
     setIsLoadingExisting(true);
@@ -210,6 +225,26 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     }
     setResults((prev) => prev.filter((r) => r.dbId !== result.dbId));
     toast.success("Opportunity pack removed");
+  };
+
+  const handlePartnerChange = async (result: EnrichedResult, partner: PartnerOption | null) => {
+    const newPartner = partner ? { name: partner.name, email: partner.email } : null;
+    if (result.dbId) {
+      const { error } = await supabase
+        .from("opportunity_packs")
+        .update({
+          matched_partner_name: newPartner?.name || null,
+          matched_partner_email: newPartner?.email || null,
+        })
+        .eq("id", result.dbId);
+      if (error) {
+        toast.error("Failed to update partner");
+        return;
+      }
+    }
+    setResults((prev) => prev.map((r) => (r.dbId === result.dbId ? { ...r, matchedPartner: newPartner } : r)));
+    setEditingPartnerId(null);
+    toast.success(newPartner ? `Partner set to ${newPartner.name}` : "Partner removed");
   };
 
   const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
@@ -404,14 +439,42 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                     </td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 100 }}>{partner}</td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
-                    <td className="py-2 px-2 align-top" style={{ maxWidth: 120 }}>
-                      {r.matchedPartner ? (
-                        <div className="space-y-0.5">
-                          <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
-                          <a href={`mailto:${r.matchedPartner.email}`} className="text-[10px] text-primary hover:underline">{r.matchedPartner.email}</a>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
+                      {editingPartnerId === (r.dbId || r.articleUrl) ? (
+                        <div className="space-y-1">
+                          <select
+                            className="w-full text-[11px] bg-background border border-border rounded px-1 py-0.5 text-foreground"
+                            defaultValue={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
+                            onChange={(e) => {
+                              const selected = allPartners.find(p => p.id === e.target.value);
+                              handlePartnerChange(r, selected || null);
+                            }}
+                          >
+                            <option value="">— None —</option>
+                            {allPartners.map(p => (
+                              <option key={p.id} value={p.id}>{p.name} ({p.region})</option>
+                            ))}
+                          </select>
+                          <button onClick={() => setEditingPartnerId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <div className="flex items-start gap-1 group/partner">
+                          {r.matchedPartner ? (
+                            <div className="space-y-0.5 min-w-0">
+                              <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
+                              <a href={`mailto:${r.matchedPartner.email}`} className="text-[10px] text-primary hover:underline">{r.matchedPartner.email}</a>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-[11px]">—</span>
+                          )}
+                          <button
+                            onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)}
+                            className="opacity-0 group-hover/partner:opacity-100 p-0.5 text-muted-foreground hover:text-primary transition-opacity shrink-0 mt-0.5"
+                            title="Change partner"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </button>
+                        </div>
                       )}
                     </td>
                     <td className="py-2 px-2 align-top">
@@ -483,7 +546,31 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               {/* BD context summary bar */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border rounded-t-xl bg-muted/30 text-xs">
                 {sc?.partnerOrSI && <span className="text-foreground">🤝 Involved: {sc.partnerOrSI}</span>}
-                {r.matchedPartner && <span className="text-primary font-medium">🏢 FlytBase Partner: {r.matchedPartner.name}</span>}
+                {r.matchedPartner ? (
+                  <span className="text-primary font-medium inline-flex items-center gap-1">
+                    🏢 FlytBase Partner: {r.matchedPartner.name}
+                    <button onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)} className="text-muted-foreground hover:text-primary"><Edit2 className="w-3 h-3" /></button>
+                  </span>
+                ) : (
+                  <button onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)} className="text-muted-foreground hover:text-primary text-[11px] inline-flex items-center gap-1">
+                    🏢 Assign Partner <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+                {editingPartnerId === (r.dbId || r.articleUrl) && (
+                  <select
+                    className="text-[11px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
+                    defaultValue={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
+                    onChange={(e) => {
+                      const selected = allPartners.find(p => p.id === e.target.value);
+                      handlePartnerChange(r, selected || null);
+                    }}
+                  >
+                    <option value="">— None —</option>
+                    {allPartners.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.region})</option>
+                    ))}
+                  </select>
+                )}
                 {(sc?.city || sc?.country) && <span className="text-foreground">📍 {[sc?.city, sc?.country].filter(Boolean).join(", ")}</span>}
                 {sc?.unitsMentioned && <span className="text-foreground">📦 {sc.unitsMentioned} units</span>}
                 {sc?.buyingIntentType && (
