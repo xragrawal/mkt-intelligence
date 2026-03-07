@@ -1,0 +1,1 @@
+ALTER TABLE public.scored_articles ADD COLUMN poc_name text DEFAULT NULL;

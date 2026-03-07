@@ -231,6 +231,7 @@ export type Database = {
           is_relevant: boolean
           lead_clarity_score: number | null
           partner_or_si: string | null
+          poc_name: string | null
           source_quality_score: number | null
           units_mentioned: number | null
           why_it_matters: string | null
@@ -253,6 +254,7 @@ export type Database = {
           is_relevant?: boolean
           lead_clarity_score?: number | null
           partner_or_si?: string | null
+          poc_name?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
           why_it_matters?: string | null
@@ -275,6 +277,7 @@ export type Database = {
           is_relevant?: boolean
           lead_clarity_score?: number | null
           partner_or_si?: string | null
+          poc_name?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
           why_it_matters?: string | null
