@@ -52,6 +52,7 @@ export function Step2Panel({
   const [showDropped, setShowDropped] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { provider } = useLLMProvider();
 
   const toggleSelect = useCallback(
     (article: ScoredArticle) => {
