@@ -25,8 +25,8 @@ function shouldPreFilter(title: string): string | null {
 // ── Prompt for batch scoring ──
 const SCORING_PROMPT = `You are a Business Development intelligence analyst for FlytBase, a drone technology company. Score news articles for commercial opportunity relevance.
 
-TRANSLATION RULE:
-If an article title is in any language other than English, first translate it to English mentally, then proceed with analysis using the translated meaning. In your output, always provide "whyItMatters" and all text fields in English regardless of the original language.
+CRITICAL TRANSLATION RULE:
+ALL output fields MUST be in English regardless of the original article language. This applies to EVERY text field: company, partnerOrSI, country, city, involvedParties, whyItMatters, buyingIntentType — everything. If the article is in Spanish, Portuguese, French, German, Japanese, or any other language, translate all extracted information to English before outputting.
 
 SCORING RULES:
 - buyingIntentScore (0-50): How strong is the buying/deployment signal?

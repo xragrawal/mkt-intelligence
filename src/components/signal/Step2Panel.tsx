@@ -202,7 +202,23 @@ export function Step2Panel({
           </div>
         </div>
         {scoredArticles.length > 0 && (
-          <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7"
+              onClick={() => {
+                if (selectedArticles.length === filtered.length) {
+                  onSelectionChange([]);
+                } else {
+                  onSelectionChange([...filtered]);
+                }
+              }}
+            >
+              {selectedArticles.length === filtered.length ? "Deselect All" : "Select All"}
+            </Button>
+            <span className="text-sm text-muted-foreground">{selectedArticles.length} selected</span>
+          </div>
         )}
       </div>
 
@@ -367,7 +383,20 @@ export function Step2Panel({
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-2 font-medium w-8"></th>
+                <th className="py-2 pr-2 font-medium w-8">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedArticles.length === filtered.length}
+                    onChange={() => {
+                      if (selectedArticles.length === filtered.length) {
+                        onSelectionChange([]);
+                      } else {
+                        onSelectionChange([...filtered]);
+                      }
+                    }}
+                    className="accent-primary"
+                  />
+                </th>
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
                 <th className="py-2 pr-2 font-medium w-20">Source</th>
