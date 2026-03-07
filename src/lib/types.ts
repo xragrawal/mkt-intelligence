@@ -34,6 +34,8 @@ export interface ArticleScanResult {
   country: string | null;
   city: string | null;
   unitsMentioned: number | null;
+  involvedParties: string[];
+  dealValue: string | null;
   buyingIntentType: BuyingIntentType;
   leadClarityScore: number;
   buyingIntentScore: number;

@@ -30,6 +30,8 @@ interface EnrichedResult {
     country?: string | null;
     city?: string | null;
     unitsMentioned?: number | null;
+    involvedParties?: string[];
+    dealValue?: string | null;
     buyingIntentType?: string;
     confidence?: string;
     bdImpactScore?: number;
@@ -187,6 +189,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               country: sa.scan.country,
               city: sa.scan.city,
               unitsMentioned: sa.scan.unitsMentioned,
+              involvedParties: sa.scan.involvedParties || [],
+              dealValue: sa.scan.dealValue || null,
               buyingIntentType: sa.scan.buyingIntentType,
               confidence: sa.scan.confidence,
               bdImpactScore: sa.scan.bdImpactScore,
@@ -392,9 +396,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">Involved Parties</th>
                 <th className="py-2 px-2 font-medium">Location</th>
                 <th className="py-2 px-2 font-medium">FlytBase Partner</th>
-                <th className="py-2 px-2 font-medium">Signal</th>
+                <th className="py-2 px-2 font-medium" style={{ maxWidth: 70 }}>Signal</th>
                 <th className="py-2 px-2 font-medium text-center">Units</th>
-                <th className="py-2 px-2 font-medium">Conf.</th>
+                <th className="py-2 px-2 font-medium">Value</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
               </tr>
@@ -404,9 +408,10 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 const sc = r.scanContext;
                 const location = [sc?.city, sc?.country].filter(Boolean).join(", ") || r.pack.companyProfile.deploymentRegion || "—";
                 const intentLabel = sc?.buyingIntentType ? SIGNAL_LABELS[sc.buyingIntentType as BuyingIntentType] || sc.buyingIntentType : r.pack.deploymentSignal.eventType || "—";
-                const confidence = sc?.confidence || "—";
-                const partner = sc?.partnerOrSI || "—";
+                const involvedParties = (r as any).scanContext?.involvedParties;
+                const partnerDisplay = involvedParties && involvedParties.length > 0 ? involvedParties.join(", ") : sc?.partnerOrSI || "—";
                 const units = sc?.unitsMentioned;
+                const dealValue = (r as any).scanContext?.dealValue;
 
                   return (
                   <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
@@ -437,7 +442,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
                       </a>
                     </td>
-                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 100 }}>{partner}</td>
+                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 120 }} title={partnerDisplay}><span className="line-clamp-2">{partnerDisplay}</span></td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
                       {editingPartnerId === (r.dbId || r.articleUrl) ? (
@@ -477,13 +482,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         </div>
                       )}
                     </td>
-                    <td className="py-2 px-2 align-top">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">{intentLabel}</Badge>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 70 }}>
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-nowrap">{intentLabel}</Badge>
                     </td>
                     <td className="py-2 px-2 text-center tabular-nums text-foreground align-top">{units ?? "—"}</td>
-                    <td className="py-2 px-2 align-top">
-                      <span className={`text-[10px] font-medium ${confidence === "HIGH" ? "text-primary" : confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>{confidence}</span>
-                    </td>
+                    <td className="py-2 px-2 text-foreground tabular-nums align-top">{dealValue || "—"}</td>
                     <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
                     </td>

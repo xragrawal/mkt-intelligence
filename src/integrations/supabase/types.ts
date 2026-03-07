@@ -218,8 +218,10 @@ export type Database = {
           confidence: string | null
           country: string | null
           created_at: string
+          deal_value: string | null
           drop_reason: string | null
           id: string
+          involved_parties: string[] | null
           is_relevant: boolean
           lead_clarity_score: number | null
           partner_or_si: string | null
@@ -238,8 +240,10 @@ export type Database = {
           confidence?: string | null
           country?: string | null
           created_at?: string
+          deal_value?: string | null
           drop_reason?: string | null
           id?: string
+          involved_parties?: string[] | null
           is_relevant?: boolean
           lead_clarity_score?: number | null
           partner_or_si?: string | null
@@ -258,8 +262,10 @@ export type Database = {
           confidence?: string | null
           country?: string | null
           created_at?: string
+          deal_value?: string | null
           drop_reason?: string | null
           id?: string
+          involved_parties?: string[] | null
           is_relevant?: boolean
           lead_clarity_score?: number | null
           partner_or_si?: string | null
