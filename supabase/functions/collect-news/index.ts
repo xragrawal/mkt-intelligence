@@ -244,12 +244,18 @@ serve(async (req) => {
       { gl: "CN", hl: "zh-CN", label: "China" },
     ];
 
-    const { keywords, filterDays = DEFAULT_FILTER_DAYS, region = "Global" } = await req.json();
+    const body = await req.json();
+    const { keywords, filterDays = DEFAULT_FILTER_DAYS } = body;
+    // Support both legacy `region` (string) and new `regions` (string[])
+    const rawRegions: string[] = body.regions || (body.region ? [body.region] : ["Global"]);
 
-    // Filter editions based on user-selected region
-    const editions = region === "Global"
-      ? ALL_EDITIONS
-      : ALL_EDITIONS.filter(e => e.label === region || e.gl === region);
+    // Filter editions based on user-selected regions
+    let editions: typeof ALL_EDITIONS;
+    if (rawRegions.includes("Global")) {
+      editions = ALL_EDITIONS;
+    } else {
+      editions = ALL_EDITIONS.filter(e => rawRegions.includes(e.label) || rawRegions.includes(e.gl));
+    }
     if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
       return new Response(JSON.stringify({ error: "keywords array required" }), {
         status: 400,
