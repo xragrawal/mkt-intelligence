@@ -161,6 +161,7 @@ serve(async (req) => {
       raw_json: pack,
       matched_partner_name: matchedPartner?.name || null,
       matched_partner_email: matchedPartner?.email || null,
+      flytbase_mentioned: pack.flytbaseMentioned || false,
     };
 
     // Add batch reference if provided

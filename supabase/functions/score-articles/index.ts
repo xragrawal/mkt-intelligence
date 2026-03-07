@@ -46,9 +46,12 @@ IMPORTANT DEDUP RULE:
 If multiple articles cover the SAME company doing the SAME thing (same deployment, contract, partnership, etc.), give the BEST one a high score and give duplicates a dropReason of "Duplicate coverage of same event".
 
 INVOLVED PARTIES EXTRACTION RULE:
-- involvedParties should list ALL meaningful party names: the buyer/deployer company, government agencies, contractors, system integrators, partners, etc.
-- De-prioritize well-known drone manufacturers that are likely search keywords (e.g. "DJI", "Skydio") — these are already known context and don't help identify new leads. Only include them if they are acting as a buyer/deployer rather than just being a product mentioned.
+- involvedParties MUST list ALL meaningful party names mentioned or inferable from the article: the buyer, deployer, operator, government agency, police department, military branch, contractor, system integrator, service provider, municipality, utility company, etc.
+- Be EXHAUSTIVE: if an article mentions "Bahia Civil Police", "OCA Drones", "City of Salvador" — list ALL of them, not just one.
+- De-prioritize well-known drone manufacturers that are likely search keywords (e.g. "DJI", "Skydio", "Autel") — these are already known context. Only include them if they are acting as a buyer/deployer.
+- Also de-prioritize "FlytBase" itself — it is the user's own company and not a new lead.
 - Prioritize extracting the BUYER, the OPERATOR, the CONTRACTOR, the GOVERNMENT AGENCY, the SYSTEM INTEGRATOR — these are the actionable leads.
+- If the article mentions a specific department, division, or named entity within a larger organization, include the specific name (e.g. "Bahia Civil Police" not just "Police").
 
 BUYING INTENT TYPES: LIVE_DEPLOYMENT, CONTRACT_AWARD, TENDER, PARTNER_ANNOUNCEMENT, EXPANSION, FUNDING, REGULATION, OTHER
 CONFIDENCE: HIGH, MEDIUM, LOW
