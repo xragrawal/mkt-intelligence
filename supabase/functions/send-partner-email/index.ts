@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.10";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,26 +46,17 @@ serve(async (req) => {
       throw new Error("SMTP credentials not configured");
     }
 
-    const client = new SmtpClient();
-
     const port = parseInt(SMTP_PORT, 10);
-    const useTLS = port === 465;
 
-    if (useTLS) {
-      await client.connectTLS({
-        hostname: SMTP_HOST,
-        port,
-        username: SMTP_USER,
-        password: SMTP_PASS,
-      });
-    } else {
-      await client.connect({
-        hostname: SMTP_HOST,
-        port,
-        username: SMTP_USER,
-        password: SMTP_PASS,
-      });
-    }
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port,
+      secure: port === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    });
 
     const subject = `🚀 New Opportunity: ${companyName} — ${eventType || "Deployment Signal"}`;
 
@@ -110,15 +101,13 @@ serve(async (req) => {
 </body>
 </html>`;
 
-    await client.send({
+    await transporter.sendMail({
       from: SMTP_USER,
       to: partnerEmail,
       subject,
-      content: "Please view this email in an HTML-capable client.",
+      text: "Please view this email in an HTML-capable client.",
       html: htmlBody,
     });
-
-    await client.close();
 
     return new Response(
       JSON.stringify({ success: true, message: `Email sent to ${partnerEmail}` }),
