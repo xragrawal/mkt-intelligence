@@ -1,0 +1,1 @@
+TRUNCATE TABLE public.opportunity_packs;

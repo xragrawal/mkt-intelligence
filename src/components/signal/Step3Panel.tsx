@@ -52,7 +52,7 @@ interface PartnerOption {
   region: string;
 }
 
-const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
+const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate", "deleted"];
 
 export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3PanelProps) {
   const [isEnriching, setIsEnriching] = useState(false);
@@ -227,11 +227,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   };
 
   const handleDelete = async (result: EnrichedResult) => {
-    if (result.dbId) {
-      await supabase.from("opportunity_packs").delete().eq("id", result.dbId);
-    }
-    setResults((prev) => prev.filter((r) => r.dbId !== result.dbId));
-    toast.success("Opportunity pack removed");
+    await handleStatusChange(result, "deleted");
   };
 
   const handlePartnerChange = async (result: EnrichedResult, partner: PartnerOption | null) => {
@@ -399,7 +395,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">Value</th>
                 <th className="py-2 px-2 font-medium">Location</th>
                 <th className="py-2 px-2 font-medium">FlytBase Partner</th>
-                <th className="py-2 px-2 font-medium w-10 text-center" title="FlytBase mentioned in article">FB</th>
+                <th className="py-2 px-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FlytBase Exist?</th>
                 <th className="py-2 px-2 font-medium" style={{ maxWidth: 80 }}>Signal</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
@@ -497,17 +493,13 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         </div>
                       )}
                     </td>
-                    <td className="py-2 px-2 text-center align-top w-10">
-                      {r.flytbaseMentioned ? (
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-signal-partner/20 text-signal-partner" title="FlytBase mentioned in article — may already be a known relationship">
-                          <AlertTriangle className="w-3 h-3" />
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground/40">—</span>
-                      )}
+                    <td className="py-2 px-2 text-center align-top w-16">
+                      <span className={`text-[10px] font-medium ${r.flytbaseMentioned ? "text-signal-partner" : "text-muted-foreground"}`}>
+                        {r.flytbaseMentioned ? "Yes" : "No"}
+                      </span>
                     </td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 80 }}>
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">{intentLabel}</Badge>
+                      <span className="text-[10px] font-medium whitespace-normal leading-tight">{intentLabel}</span>
                     </td>
                     <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-normal leading-tight ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
@@ -519,14 +511,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                             <Briefcase className="w-3 h-3" /> CRM
                           </Button>
                         )}
-                         {r.status !== "shared_with_partners" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
-                            <Users className="w-3 h-3" /> Partner
-                          </Button>
-                        )}
                         {r.matchedPartner && (
                           <Button variant="ghost" size="sm" onClick={() => handleSendToPartner(r)} disabled={sendingEmailFor === (r.dbId || r.articleUrl)} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary">
-                            {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email
+                            {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email Partner
                           </Button>
                         )}
                         {r.status !== "duplicate" && (
