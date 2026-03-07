@@ -478,13 +478,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         </div>
                       )}
                     </td>
-                    <td className="py-2 px-2 align-top">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">{intentLabel}</Badge>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 70 }}>
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-nowrap">{intentLabel}</Badge>
                     </td>
                     <td className="py-2 px-2 text-center tabular-nums text-foreground align-top">{units ?? "—"}</td>
-                    <td className="py-2 px-2 align-top">
-                      <span className={`text-[10px] font-medium ${confidence === "HIGH" ? "text-primary" : confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>{confidence}</span>
-                    </td>
+                    <td className="py-2 px-2 text-foreground tabular-nums align-top">{dealValue || "—"}</td>
                     <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
                     </td>
