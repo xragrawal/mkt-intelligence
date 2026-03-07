@@ -433,14 +433,27 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         <span className="text-[10px] text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
-                      <div className="font-medium text-foreground break-words leading-tight">{r.pack.companyProfile.companyName}</div>
-                      <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline text-[10px] break-words leading-tight inline-flex items-center gap-0.5 mt-0.5">
-                        <span className="line-clamp-2">{r.articleTitle}</span>
-                        <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
-                      </a>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 180 }}>
+                      {(() => {
+                        const companyName = r.pack.companyProfile.companyName;
+                        const parties = [
+                          ...(companyName && companyName !== "Unknown" ? [companyName] : []),
+                          ...(involvedParties || []).filter((p: string) => p !== companyName),
+                          ...(sc?.partnerOrSI && sc.partnerOrSI !== companyName ? [sc.partnerOrSI] : []),
+                        ].filter(Boolean);
+                        const display = parties.length > 0 ? parties.join(", ") : "—";
+                        return (
+                          <div>
+                            <div className="font-medium text-foreground break-words leading-tight line-clamp-2" title={display}>{display}</div>
+                            <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline text-[10px] break-words leading-tight inline-flex items-center gap-0.5 mt-0.5">
+                              <span className="line-clamp-2">{r.articleTitle}</span>
+                              <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
+                            </a>
+                          </div>
+                        );
+                      })()}
                     </td>
-                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 120 }} title={partnerDisplay}><span className="line-clamp-2">{partnerDisplay}</span></td>
+                    <td className="py-2 px-2 text-foreground tabular-nums align-top">{dealValue || "—"}</td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
                       {editingPartnerId === (r.dbId || r.articleUrl) ? (
