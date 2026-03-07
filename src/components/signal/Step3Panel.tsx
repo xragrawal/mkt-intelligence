@@ -195,6 +195,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               unitsMentioned: sa.scan.unitsMentioned,
               involvedParties: sa.scan.involvedParties || [],
               dealValue: sa.scan.dealValue || null,
+              pocName: sa.scan.pocName || null,
               buyingIntentType: sa.scan.buyingIntentType,
               confidence: sa.scan.confidence,
               bdImpactScore: sa.scan.bdImpactScore,
