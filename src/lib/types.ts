@@ -116,7 +116,7 @@ export interface PipelineBreakdown {
   newArticles: number;
 }
 
-export type LeadStatus = "open" | "shared_with_partners" | "acted_internally" | "closed" | "archived" | "duplicate";
+export type LeadStatus = "open" | "shared_with_partners" | "acted_internally" | "closed" | "archived" | "duplicate" | "deleted";
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   open: "Open",
@@ -125,6 +125,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   closed: "Closed",
   archived: "Archived",
   duplicate: "Duplicate",
+  deleted: "Deleted",
 };
 
 export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
@@ -134,6 +135,7 @@ export const LEAD_STATUS_COLORS: Record<LeadStatus, string> = {
   closed: "bg-signal-contract/15 text-signal-contract",
   archived: "bg-muted text-muted-foreground",
   duplicate: "bg-destructive/15 text-destructive",
+  deleted: "bg-destructive/10 text-destructive/70",
 };
 
 export const SIGNAL_COLORS: Record<BuyingIntentType, string> = {

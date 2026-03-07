@@ -52,7 +52,7 @@ interface PartnerOption {
   region: string;
 }
 
-const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate"];
+const STATUS_FILTERS: LeadStatus[] = ["open", "shared_with_partners", "acted_internally", "closed", "archived", "duplicate", "deleted"];
 
 export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3PanelProps) {
   const [isEnriching, setIsEnriching] = useState(false);
