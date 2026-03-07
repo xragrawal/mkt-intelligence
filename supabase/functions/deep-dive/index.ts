@@ -18,6 +18,7 @@ RULES:
 - Set values to null if not explicitly supported by the article
 - opportunityScore 0-100; score higher when scale/expansion is implied
 - ALL output text MUST be in English. If the source article is in another language, translate all content to English.
+- FLYTBASE MENTION CHECK: Determine if "FlytBase" (case-insensitive) is mentioned anywhere in the article title or context. Set flytbaseMentioned=true if so. This helps the BD team avoid redundant outreach to companies already working with FlytBase.
 
 The output must be a structured Opportunity Intelligence Pack.`;
 
@@ -62,8 +63,9 @@ const DEEP_DIVE_TOOL = {
           required: ["whyThisIsHot", "strategicEntryPoint", "partnershipAngle", "riskFactors", "opportunityScore"],
         },
         crmReadyNotes: { type: "string" },
+        flytbaseMentioned: { type: "boolean", description: "true if FlytBase is mentioned in the article title or context" },
       },
-      required: ["companyProfile", "deploymentSignal", "bdOpportunityAssessment", "crmReadyNotes"],
+      required: ["companyProfile", "deploymentSignal", "bdOpportunityAssessment", "crmReadyNotes", "flytbaseMentioned"],
       additionalProperties: false,
     },
   },
@@ -159,6 +161,7 @@ serve(async (req) => {
       raw_json: pack,
       matched_partner_name: matchedPartner?.name || null,
       matched_partner_email: matchedPartner?.email || null,
+      flytbase_mentioned: pack.flytbaseMentioned || false,
     };
 
     // Add batch reference if provided

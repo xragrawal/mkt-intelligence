@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Mail, Edit2, Check } from "lucide-react";
+import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Mail, Edit2, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
@@ -24,6 +24,7 @@ interface EnrichedResult {
   createdAt?: string;
   articleSource?: string | null;
   matchedPartner?: { name: string; email: string } | null;
+  flytbaseMentioned?: boolean;
   scanContext?: {
     company?: string | null;
     partnerOrSI?: string | null;
@@ -93,6 +94,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           status: (row.status as LeadStatus) || "open",
           createdAt: row.created_at,
           matchedPartner: row.matched_partner_name ? { name: row.matched_partner_name, email: row.matched_partner_email } : null,
+          flytbaseMentioned: row.flytbase_mentioned || false,
           batchRef: {
             batchId: row.batch_id || undefined,
             keywords: row.keywords || undefined,
@@ -183,6 +185,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             status: "open",
             createdAt: new Date().toISOString(),
             matchedPartner: data.matchedPartner || null,
+            flytbaseMentioned: data.pack?.flytbaseMentioned || false,
             scanContext: {
               company: sa.scan.company,
               partnerOrSI: sa.scan.partnerOrSI,
@@ -396,6 +399,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">Value</th>
                 <th className="py-2 px-2 font-medium">Location</th>
                 <th className="py-2 px-2 font-medium">FlytBase Partner</th>
+                <th className="py-2 px-2 font-medium w-10 text-center" title="FlytBase mentioned in article">FB</th>
                 <th className="py-2 px-2 font-medium" style={{ maxWidth: 80 }}>Signal</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
@@ -491,6 +495,15 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                             <Edit2 className="w-3 h-3" />
                           </button>
                         </div>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 text-center align-top w-10">
+                      {r.flytbaseMentioned ? (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-signal-partner/20 text-signal-partner" title="FlytBase mentioned in article — may already be a known relationship">
+                          <AlertTriangle className="w-3 h-3" />
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
                       )}
                     </td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 80 }}>
