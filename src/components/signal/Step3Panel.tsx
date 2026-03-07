@@ -499,7 +499,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                       </span>
                     </td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 80 }}>
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">{intentLabel}</Badge>
+                      <span className="text-[10px] font-medium whitespace-normal leading-tight">{intentLabel}</span>
                     </td>
                     <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-normal leading-tight ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
