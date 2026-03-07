@@ -390,7 +390,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 px-2 font-medium">#</th>
-                <th className="py-2 px-2 font-medium">Batch Ref</th>
+                <th className="py-2 px-2 font-medium">Source Article</th>
                 <th className="py-2 px-2 font-medium">Involved Parties</th>
                 <th className="py-2 px-2 font-medium">Value</th>
                 <th className="py-2 px-2 font-medium">Location</th>
