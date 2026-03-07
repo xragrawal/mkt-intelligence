@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin, Filter, FilterX, Brain } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin, Filter, FilterX, Brain, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS } from "@/lib/types";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS, CONTINENT_COUNTRY_MAP, CONTINENTS, resolveRegionsToCountries } from "@/lib/types";
 import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
 import { SourceBadge } from "@/components/signal/SourceBadge";
 import { useLLMProvider, LLM_OPTIONS, type LLMProvider } from "@/lib/llm-context";
@@ -27,7 +28,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [keywords, setKeywords] = useState<string[]>(DEFAULT_KEYWORDS);
   const [inputValue, setInputValue] = useState("");
   const [filterDays, setFilterDays] = useState(DEFAULT_FILTER_DAYS);
-  const [region, setRegion] = useState<NewsRegion>("Global");
+  const [selectedRegions, setSelectedRegions] = useState<string[]>(["Global"]);
   const [isCollecting, setIsCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<(CollectedArticle | FetchedArticleSummary)[]>([]);
@@ -84,6 +85,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
         
+        const resolvedRegions = resolveRegionsToCountries(selectedRegions);
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collect-news`;
         const resp = await fetch(url, {
           method: "POST",
@@ -92,7 +94,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
-          body: JSON.stringify({ keywords, filterDays, region }),
+          body: JSON.stringify({ keywords, filterDays, regions: resolvedRegions }),
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
@@ -271,17 +273,78 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         {useGoogleNews && (
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-muted-foreground" />
-            <label className="text-sm text-muted-foreground">Region</label>
-            <Select value={region} onValueChange={(v) => setRegion(v as NewsRegion)}>
-              <SelectTrigger className="w-[140px] h-8 text-sm bg-muted border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {NEWS_REGIONS.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-sm text-muted-foreground">News Editions</label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-sm bg-muted border-border min-w-[140px] justify-start">
+                  {selectedRegions.includes("Global")
+                    ? "Global (All)"
+                    : selectedRegions.length === 0
+                    ? "Select…"
+                    : selectedRegions.length <= 2
+                    ? selectedRegions.join(", ")
+                    : `${selectedRegions.length} selected`}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3 max-h-80 overflow-y-auto" align="start">
+                <div className="space-y-3">
+                  {/* Global option */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={selectedRegions.includes("Global")}
+                      onCheckedChange={(checked) => {
+                        if (checked) setSelectedRegions(["Global"]);
+                        else setSelectedRegions([]);
+                      }}
+                    />
+                    <span className="text-sm font-medium">Global (All Editions)</span>
+                  </label>
+                  <div className="border-t border-border" />
+                  {/* Continents & countries */}
+                  {CONTINENTS.map((continent) => {
+                    const countries = CONTINENT_COUNTRY_MAP[continent];
+                    const allSelected = countries.every(c => selectedRegions.includes(c));
+                    const someSelected = countries.some(c => selectedRegions.includes(c));
+                    return (
+                      <div key={continent} className="space-y-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            checked={allSelected}
+                            className={someSelected && !allSelected ? "opacity-60" : ""}
+                            onCheckedChange={(checked) => {
+                              setSelectedRegions(prev => {
+                                const without = prev.filter(r => r !== "Global" && !countries.includes(r));
+                                return checked ? [...without, ...countries] : without;
+                              });
+                            }}
+                          />
+                          <span className="text-sm font-semibold text-foreground">{continent}</span>
+                        </label>
+                        <div className="ml-6 space-y-0.5">
+                          {countries.map((country) => (
+                            <label key={country} className="flex items-center gap-2 cursor-pointer">
+                              <Checkbox
+                                checked={selectedRegions.includes(country)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedRegions(prev => {
+                                    const without = prev.filter(r => r !== "Global" && r !== country);
+                                    return checked ? [...without, country] : without;
+                                  });
+                                }}
+                              />
+                              <span className="text-xs text-foreground">{country}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <span className="text-[10px] text-muted-foreground/70 inline-flex items-center gap-0.5" title="Region controls which Google News edition is queried, not the article's subject location. An article from Germany's edition may cover events in other countries.">
+              <Info className="w-3 h-3" /> Edition = source, not topic location
+            </span>
           </div>
         )}
 

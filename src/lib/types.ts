@@ -170,8 +170,25 @@ export const MAX_ARTICLES_STORED = 50;
 
 export const MIN_BD_IMPACT_SCORE = 60;
 
+export const CONTINENT_COUNTRY_MAP: Record<string, string[]> = {
+  "North America": ["US", "Canada", "Mexico"],
+  "Europe": ["UK", "Germany", "France", "Italy", "Spain"],
+  "Asia Pacific": ["India", "Japan", "South Korea", "Singapore", "Indonesia", "China", "Australia"],
+  "Middle East": ["Saudi Arabia", "UAE"],
+  "Africa": ["South Africa", "Nigeria"],
+  "South America": ["Brazil"],
+};
+
 export const NEWS_REGIONS = [
   "Global",
+  // Continents
+  "North America",
+  "Europe",
+  "Asia Pacific",
+  "Middle East",
+  "Africa",
+  "South America",
+  // Countries
   "US",
   "UK",
   "Canada",
@@ -195,3 +212,19 @@ export const NEWS_REGIONS = [
 ] as const;
 
 export type NewsRegion = (typeof NEWS_REGIONS)[number];
+
+export const CONTINENTS = Object.keys(CONTINENT_COUNTRY_MAP);
+
+/** Resolve selected regions (which may include continents) to individual country labels */
+export function resolveRegionsToCountries(selections: string[]): string[] {
+  if (selections.includes("Global")) return ["Global"];
+  const countries = new Set<string>();
+  for (const sel of selections) {
+    if (CONTINENT_COUNTRY_MAP[sel]) {
+      CONTINENT_COUNTRY_MAP[sel].forEach(c => countries.add(c));
+    } else {
+      countries.add(sel);
+    }
+  }
+  return Array.from(countries);
+}

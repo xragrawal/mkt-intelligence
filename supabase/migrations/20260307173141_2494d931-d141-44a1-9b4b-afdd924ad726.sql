@@ -1,0 +1,1 @@
+TRUNCATE TABLE public.opportunity_packs, public.scored_articles, public.collected_articles, public.collection_runs;

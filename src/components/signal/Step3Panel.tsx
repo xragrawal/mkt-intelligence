@@ -497,11 +497,22 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                             <Briefcase className="w-3 h-3" /> CRM
                           </Button>
                         )}
-                        {r.matchedPartner && (
-                          <Button variant="ghost" size="sm" onClick={() => handleSendToPartner(r)} disabled={sendingEmailFor === (r.dbId || r.articleUrl)} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary">
-                            {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email Partner
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (!r.matchedPartner) {
+                              setEditingPartnerId(r.dbId || r.articleUrl);
+                              toast.info("Assign a partner first, then click Email Partner");
+                            } else {
+                              handleSendToPartner(r);
+                            }
+                          }}
+                          disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
+                          className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary"
+                        >
+                          {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email Partner
+                        </Button>
                         {r.status !== "duplicate" && (
                           <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
                             Dup
@@ -596,11 +607,22 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                       <Briefcase className="w-3.5 h-3.5" /> Add to CRM
                     </Button>
                   )}
-                  {r.matchedPartner && (
-                    <Button variant="ghost" size="sm" onClick={() => handleSendToPartner(r)} disabled={sendingEmailFor === (r.dbId || r.articleUrl)} className="text-xs gap-1.5 text-muted-foreground hover:text-primary">
-                      {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Send to Partner
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (!r.matchedPartner) {
+                        setEditingPartnerId(r.dbId || r.articleUrl);
+                        toast.info("Assign a partner first");
+                      } else {
+                        handleSendToPartner(r);
+                      }
+                    }}
+                    disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
+                    className="text-xs gap-1.5 text-muted-foreground hover:text-primary"
+                  >
+                    {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Email Partner
+                  </Button>
                   {r.status !== "duplicate" && (
                     <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
                       Mark Duplicate
