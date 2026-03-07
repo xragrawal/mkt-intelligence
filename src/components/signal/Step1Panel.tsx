@@ -85,6 +85,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
         
+        const resolvedRegions = resolveRegionsToCountries(selectedRegions);
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collect-news`;
         const resp = await fetch(url, {
           method: "POST",
@@ -93,7 +94,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
-          body: JSON.stringify({ keywords, filterDays, region }),
+          body: JSON.stringify({ keywords, filterDays, regions: resolvedRegions }),
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
