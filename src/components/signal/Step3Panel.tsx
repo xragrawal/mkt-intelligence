@@ -33,6 +33,7 @@ interface EnrichedResult {
     unitsMentioned?: number | null;
     involvedParties?: string[];
     dealValue?: string | null;
+    pocName?: string | null;
     buyingIntentType?: string;
     confidence?: string;
     bdImpactScore?: number;
