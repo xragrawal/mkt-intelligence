@@ -404,6 +404,7 @@ export function Step2Panel({
                 <th className="py-2 pr-2 font-medium w-16">Value</th>
                 <th className="py-2 pr-2 font-medium w-20">Signal</th>
                 <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
+                <th className="py-2 pr-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
                 <th className="py-2 font-medium w-8"></th>
               </tr>
             </thead>
