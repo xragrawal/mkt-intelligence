@@ -202,7 +202,7 @@ function deduplicateArticles(articles: RSSArticle[]): { deduped: RSSArticle[]; r
     }
     if (isDuplicate) continue;
 
-    seen.set(article.url, article);
+    seen.set(normalizeUrl(article.url), article);
     seenTitles.add(normTitle);
     seenSlugs.add(slug);
     seenContentWords.push({ words, article });
