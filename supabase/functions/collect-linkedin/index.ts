@@ -184,9 +184,17 @@ serve(async (req) => {
 
     let cookies: any[];
     try {
-      cookies = JSON.parse(cookiesStr);
+      const parsed = JSON.parse(cookiesStr);
+      if (Array.isArray(parsed)) {
+        cookies = parsed;
+      } else if (typeof parsed === "object") {
+        // Support {li_at: "...", JSESSIONID: "..."} format
+        cookies = Object.entries(parsed).map(([name, value]) => ({ name, value }));
+      } else {
+        throw new Error("not an array or object");
+      }
     } catch {
-      return new Response(JSON.stringify({ error: "Invalid LINKEDIN_COOKIES format. Must be a JSON array." }), {
+      return new Response(JSON.stringify({ error: "Invalid LINKEDIN_COOKIES format. Must be a JSON array of cookie objects with 'name' and 'value' fields, e.g. [{\"name\":\"li_at\",\"value\":\"...\"}]" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
