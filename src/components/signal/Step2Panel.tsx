@@ -371,10 +371,9 @@ export function Step2Panel({
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
                 <th className="py-2 pr-2 font-medium w-20">Source</th>
-                <th className="py-2 pr-2 font-medium w-24">Company</th>
-                <th className="py-2 pr-2 font-medium" style={{ maxWidth: 100 }}>Parties</th>
-                <th className="py-2 pr-2 font-medium w-16">Signal</th>
+                <th className="py-2 pr-2 font-medium" style={{ maxWidth: 140 }}>Involved Parties</th>
                 <th className="py-2 pr-2 font-medium w-16">Value</th>
+                <th className="py-2 pr-2 font-medium w-20">Signal</th>
                 <th className="py-2 pr-2 font-medium w-14 text-center">Score</th>
                 <th className="py-2 font-medium w-8"></th>
               </tr>
