@@ -392,9 +392,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">Involved Parties</th>
                 <th className="py-2 px-2 font-medium">Location</th>
                 <th className="py-2 px-2 font-medium">FlytBase Partner</th>
-                <th className="py-2 px-2 font-medium">Signal</th>
+                <th className="py-2 px-2 font-medium" style={{ maxWidth: 70 }}>Signal</th>
                 <th className="py-2 px-2 font-medium text-center">Units</th>
-                <th className="py-2 px-2 font-medium">Conf.</th>
+                <th className="py-2 px-2 font-medium">Value</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
               </tr>
