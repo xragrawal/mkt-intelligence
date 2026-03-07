@@ -497,6 +497,15 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         </div>
                       )}
                     </td>
+                    <td className="py-2 px-2 text-center align-top w-10">
+                      {r.flytbaseMentioned ? (
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-signal-partner/20 text-signal-partner" title="FlytBase mentioned in article — may already be a known relationship">
+                          <AlertTriangle className="w-3 h-3" />
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
+                    </td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 80 }}>
                       <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">{intentLabel}</Badge>
                     </td>
