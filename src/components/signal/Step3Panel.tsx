@@ -94,6 +94,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           status: (row.status as LeadStatus) || "open",
           createdAt: row.created_at,
           matchedPartner: row.matched_partner_name ? { name: row.matched_partner_name, email: row.matched_partner_email } : null,
+          flytbaseMentioned: row.flytbase_mentioned || false,
           batchRef: {
             batchId: row.batch_id || undefined,
             keywords: row.keywords || undefined,
