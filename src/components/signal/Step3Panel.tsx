@@ -438,7 +438,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
                       </a>
                     </td>
-                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 100 }}>{partner}</td>
+                    <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 120 }} title={partnerDisplay}><span className="line-clamp-2">{partnerDisplay}</span></td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
                       {editingPartnerId === (r.dbId || r.articleUrl) ? (
