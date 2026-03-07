@@ -227,6 +227,26 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     toast.success("Opportunity pack removed");
   };
 
+  const handlePartnerChange = async (result: EnrichedResult, partner: PartnerOption | null) => {
+    const newPartner = partner ? { name: partner.name, email: partner.email } : null;
+    if (result.dbId) {
+      const { error } = await supabase
+        .from("opportunity_packs")
+        .update({
+          matched_partner_name: newPartner?.name || null,
+          matched_partner_email: newPartner?.email || null,
+        })
+        .eq("id", result.dbId);
+      if (error) {
+        toast.error("Failed to update partner");
+        return;
+      }
+    }
+    setResults((prev) => prev.map((r) => (r.dbId === result.dbId ? { ...r, matchedPartner: newPartner } : r)));
+    setEditingPartnerId(null);
+    toast.success(newPartner ? `Partner set to ${newPartner.name}` : "Partner removed");
+  };
+
   const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
 
   const handleSendToPartner = async (result: EnrichedResult) => {
