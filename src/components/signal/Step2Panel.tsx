@@ -467,6 +467,17 @@ export function Step2Panel({
                     <td className="py-2.5 pr-2 text-center">
                       <span className="font-display font-bold text-primary tabular-nums">{sa.scan.bdImpactScore}</span>
                     </td>
+                    <td className="py-2.5 pr-2 text-center w-16">
+                      {(() => {
+                        const titleLower = (sa.article.title || "").toLowerCase();
+                        const mentioned = titleLower.includes("flytbase");
+                        return (
+                          <span className={`text-[10px] font-medium ${mentioned ? "text-signal-partner" : "text-muted-foreground"}`}>
+                            {mentioned ? "Yes" : "No"}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="py-2.5">
                       <button
                         onClick={(e) => { e.stopPropagation(); setExpandedId(expandedId === sa.article.id ? null : sa.article.id); }}
