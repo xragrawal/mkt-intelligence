@@ -325,6 +325,13 @@ export function Step2Panel({
             <span className="text-muted-foreground">Relevant</span>
             <span className="text-primary font-bold">{stats.totalRelevant}</span>
           </div>
+          {!isGlobal && regionFiltered.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Globe className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Region-filtered</span>
+              <span className="text-destructive font-medium">{regionFiltered.length}</span>
+            </div>
+          )}
         </div>
       )}
 
