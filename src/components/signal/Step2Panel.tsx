@@ -84,7 +84,7 @@ export function Step2Panel({
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ batchId: collectionRun.id, minScore: MIN_BD_IMPACT_SCORE }),
+        body: JSON.stringify({ batchId: collectionRun.id, minScore: MIN_BD_IMPACT_SCORE, llmProvider: provider }),
       });
 
       if (!resp.ok) {
