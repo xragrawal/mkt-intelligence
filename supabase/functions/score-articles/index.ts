@@ -251,7 +251,11 @@ serve(async (req) => {
           send({ type: "progress", current: 0, total: articles.length });
 
           const articleList = toScore
-            .map((a, i) => `[${i}] Title: ${a.title}\n    Source: ${a.publishing_agency || "Unknown"}\n    URL: ${a.url}\n    Published: ${a.published_at || "Unknown"}`)
+            .map((a, i) => {
+              let entry = `[${i}] Title: ${a.title}\n    Source: ${a.publishing_agency || "Unknown"}\n    URL: ${a.url}\n    Published: ${a.published_at || "Unknown"}`;
+              if (a.snippet) entry += `\n    Snippet: ${a.snippet}`;
+              return entry;
+            })
             .join("\n\n");
 
           try {

@@ -1,0 +1,1 @@
+ALTER TABLE public.collected_articles ADD COLUMN IF NOT EXISTS snippet text;

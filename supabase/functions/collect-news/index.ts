@@ -40,6 +40,18 @@ function titleSimilarity(a: Set<string>, b: Set<string>): number {
   return overlap / Math.min(a.size, b.size);
 }
 
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    // Strip common tracking params
+    const stripParams = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "ref", "fbclid", "gclid"];
+    stripParams.forEach(p => u.searchParams.delete(p));
+    return u.origin + u.pathname.replace(/\/+$/, "") + (u.search || "");
+  } catch {
+    return url;
+  }
+}
+
 function getUrlSlug(url: string): string {
   try {
     const u = new URL(url);
@@ -55,6 +67,7 @@ interface RSSArticle {
   url: string;
   originalUrl: string;
   title: string;
+  snippet: string | null;
   publishing_agency: string | null;
   published_at: string | null;
 }
@@ -115,6 +128,10 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
       
       const pubDate = itemXml.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1]?.trim() || null;
       const source = itemXml.match(/<source[^>]*>([\s\S]*?)<\/source>/)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() || null;
+      const description = itemXml.match(/<description>([\s\S]*?)<\/description>/)?.[1]
+        ?.replace(/<!\[CDATA\[|\]\]>/g, "")
+        ?.replace(/<[^>]+>/g, "")
+        ?.trim() || null;
 
       if (title && link) {
         const idSource = `${normalizeTitle(title)}|${source || ""}`;
@@ -124,6 +141,7 @@ async function fetchGoogleNewsRSS(keyword: string, edition: string = "US", lang:
           url: link,
           originalUrl: link,
           title,
+          snippet: description ? description.slice(0, 500) : null,
           publishing_agency: source,
           published_at: pubDate ? new Date(pubDate).toISOString() : null,
         });
@@ -159,7 +177,7 @@ function deduplicateArticles(articles: RSSArticle[]): { deduped: RSSArticle[]; r
   const seenContentWords: Array<{ words: Set<string>; article: RSSArticle }> = [];
 
   for (const article of articles) {
-    if (seen.has(article.url)) continue;
+    if (seen.has(normalizeUrl(article.url))) continue;
     
     const normTitle = normalizeTitle(article.title);
     if (seenTitles.has(normTitle)) continue;
@@ -184,7 +202,7 @@ function deduplicateArticles(articles: RSSArticle[]): { deduped: RSSArticle[]; r
     }
     if (isDuplicate) continue;
 
-    seen.set(article.url, article);
+    seen.set(normalizeUrl(article.url), article);
     seenTitles.add(normTitle);
     seenSlugs.add(slug);
     seenContentWords.push({ words, article });
@@ -301,14 +319,14 @@ serve(async (req) => {
         .select("id, url, title");
 
       const existingIds = new Set((existingArticles || []).map(a => a.id));
-      const existingUrls = new Set((existingArticles || []).map(a => a.url));
+      const existingUrls = new Set((existingArticles || []).map(a => normalizeUrl(a.url)));
       const existingContentWords = (existingArticles || []).map(a => getContentWords(a.title));
 
       const newArticles = toStore.filter(a => {
         // Skip if same ID already in DB
         if (existingIds.has(a.id)) return false;
         // Skip if same URL already in DB
-        if (existingUrls.has(a.url)) return false;
+        if (existingUrls.has(normalizeUrl(a.url))) return false;
         // Skip if fuzzy title match with existing DB article
         const words = getContentWords(a.title);
         for (const existing of existingContentWords) {
@@ -328,6 +346,7 @@ serve(async (req) => {
           keyword: a.keyword,
           url: a.url,
           title: a.title,
+          snippet: a.snippet,
           publishing_agency: a.publishing_agency,
           published_at: a.published_at,
           batch_id: batchId,
