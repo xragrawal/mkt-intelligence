@@ -367,6 +367,37 @@ export function Step2Panel({
         </div>
       )}
 
+      {/* Region-filtered articles */}
+      {!isGlobal && regionFiltered.length > 0 && (
+        <div className="rounded-lg bg-muted/30 border border-border">
+          <button
+            onClick={() => setShowRegionFiltered(!showRegionFiltered)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Globe className="w-3.5 h-3.5" />
+              <span>{regionFiltered.length} articles outside selected region ({selectedRegions.join(", ")})</span>
+            </div>
+            <span className="text-[10px]">{showRegionFiltered ? "Hide" : "Show"}</span>
+          </button>
+          {showRegionFiltered && (
+            <div className="px-4 pb-3 space-y-1.5 max-h-48 overflow-y-auto">
+              {regionFiltered.map((rf, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  <span className="text-muted-foreground/60 shrink-0 mt-0.5">🌍</span>
+                  <div className="min-w-0">
+                    <p className="text-foreground/70 line-clamp-1">{rf.article.title}</p>
+                    <p className="text-muted-foreground/70">
+                      Country: {rf.scan.country || "Unknown"} • Score: {rf.scan.bdImpactScore}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Errors */}
       {errors.length > 0 && (
         <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5 space-y-1">
