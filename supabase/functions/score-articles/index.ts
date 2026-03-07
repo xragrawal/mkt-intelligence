@@ -248,7 +248,7 @@ serve(async (req) => {
               userMessage: `Score these ${toScore.length} articles. Mark duplicates covering the same event. Threshold is ${scoreThreshold} — articles below this are low-priority:\n\n${articleList}`,
               tools: [BATCH_SCORING_TOOL],
               toolChoice: { type: "function", function: { name: "score_articles_batch" } },
-              model: undefined,
+              provider: llmProvider || undefined,
             });
 
             if (!result.toolCall) {

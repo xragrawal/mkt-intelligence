@@ -108,7 +108,7 @@ serve(async (req) => {
       userMessage: contextParts.join("\n"),
       tools: [DEEP_DIVE_TOOL],
       toolChoice: { type: "function", function: { name: "create_opportunity_pack" } },
-      // Uses Claude by default; switch to "gemini" when ready
+      provider: llmProvider || undefined,
     });
 
     if (!result.toolCall) throw new Error("No structured output from AI");
