@@ -397,7 +397,6 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">PoC</th>
                 <th className="py-2 px-2 font-medium">Location</th>
                 <th className="py-2 px-2 font-medium">FlytBase Partner</th>
-                <th className="py-2 px-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
               </tr>
