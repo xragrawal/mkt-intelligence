@@ -212,6 +212,48 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     toast.success("Opportunity pack removed");
   };
 
+  const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
+
+  const handleSendToPartner = async (result: EnrichedResult) => {
+    if (!result.matchedPartner) {
+      toast.error("No matched partner for this opportunity");
+      return;
+    }
+    const key = result.dbId || result.articleUrl;
+    setSendingEmailFor(key);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-partner-email", {
+        body: {
+          partnerName: result.matchedPartner.name,
+          partnerEmail: result.matchedPartner.email,
+          companyName: result.pack.companyProfile.companyName,
+          articleTitle: result.articleTitle,
+          articleUrl: result.articleUrl,
+          articleSource: result.articleSource,
+          deploymentRegion: result.pack.companyProfile.deploymentRegion,
+          inferredIndustry: result.pack.companyProfile.inferredIndustry,
+          eventType: result.pack.deploymentSignal.eventType,
+          whyThisIsHot: result.pack.bdOpportunityAssessment.whyThisIsHot,
+          strategicEntryPoint: result.pack.bdOpportunityAssessment.strategicEntryPoint,
+          partnershipAngle: result.pack.bdOpportunityAssessment.partnershipAngle,
+          opportunityScore: result.pack.bdOpportunityAssessment.opportunityScore,
+          crmReadyNotes: result.pack.crmReadyNotes,
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Email sent to ${result.matchedPartner.name}`);
+        await handleStatusChange(result, "shared_with_partners");
+      } else {
+        toast.error(data?.error || "Failed to send email");
+      }
+    } catch (e: any) {
+      toast.error("Email failed: " + e.message);
+    } finally {
+      setSendingEmailFor(null);
+    }
+  };
+
   const filteredResults = statusFilter === "all"
     ? results
     : results.filter((r) => r.status === statusFilter);
