@@ -136,10 +136,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             title: sa.article.title,
             source: sa.article.publishing_agency,
             scanContext: sa.scan,
+            llmProvider: provider,
             batchContext: collectionRun ? {
               batchId: collectionRun.id,
               keywords: collectionRun.keywords,
-              filterDays: undefined, // Could be passed from Step 1 config
+              filterDays: undefined,
               collectionRanAt: collectionRun.started_at,
             } : undefined,
           },
