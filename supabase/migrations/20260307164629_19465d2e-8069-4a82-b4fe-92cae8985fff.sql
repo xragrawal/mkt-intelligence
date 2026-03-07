@@ -1,0 +1,1 @@
+ALTER TABLE public.opportunity_packs ADD COLUMN IF NOT EXISTS flytbase_mentioned boolean DEFAULT false;

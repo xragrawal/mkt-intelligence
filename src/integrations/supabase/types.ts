@@ -121,6 +121,7 @@ export type Database = {
           event_type: string | null
           expansion_likelihood: string | null
           filter_days: number | null
+          flytbase_mentioned: boolean | null
           id: string
           inferred_industry: string | null
           keywords: string[] | null
@@ -153,6 +154,7 @@ export type Database = {
           event_type?: string | null
           expansion_likelihood?: string | null
           filter_days?: number | null
+          flytbase_mentioned?: boolean | null
           id?: string
           inferred_industry?: string | null
           keywords?: string[] | null
@@ -185,6 +187,7 @@ export type Database = {
           event_type?: string | null
           expansion_likelihood?: string | null
           filter_days?: number | null
+          flytbase_mentioned?: boolean | null
           id?: string
           inferred_industry?: string | null
           keywords?: string[] | null
