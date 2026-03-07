@@ -177,7 +177,7 @@ function deduplicateArticles(articles: RSSArticle[]): { deduped: RSSArticle[]; r
   const seenContentWords: Array<{ words: Set<string>; article: RSSArticle }> = [];
 
   for (const article of articles) {
-    if (seen.has(article.url)) continue;
+    if (seen.has(normalizeUrl(article.url))) continue;
     
     const normTitle = normalizeTitle(article.title);
     if (seenTitles.has(normTitle)) continue;
