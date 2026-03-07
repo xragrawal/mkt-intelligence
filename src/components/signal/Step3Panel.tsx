@@ -438,7 +438,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         );
                       })()}
                     </td>
-                    <td className="py-2 px-2 text-foreground tabular-nums align-top">{dealValue || "—"}</td>
+                    <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 120 }}>
+                      {sc?.pocName || (r as any).scanContext?.pocName || "—"}
+                    </td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
                     <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
                       {editingPartnerId === (r.dbId || r.articleUrl) ? (
@@ -459,7 +461,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                           <button onClick={() => setEditingPartnerId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
                         </div>
                       ) : (
-                        <div className="flex items-start gap-1 group/partner">
+                        <div className="flex items-start gap-1">
                           {r.matchedPartner ? (
                             <div className="space-y-0.5 min-w-0">
                               <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
@@ -470,7 +472,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                           )}
                           <button
                             onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)}
-                            className="opacity-0 group-hover/partner:opacity-100 p-0.5 text-muted-foreground hover:text-primary transition-opacity shrink-0 mt-0.5"
+                            className="p-0.5 text-muted-foreground hover:text-primary shrink-0 mt-0.5"
                             title="Change partner"
                           >
                             <Edit2 className="w-3 h-3" />
@@ -482,9 +484,6 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                       <span className={`text-[10px] font-medium ${r.flytbaseMentioned ? "text-signal-partner" : "text-muted-foreground"}`}>
                         {r.flytbaseMentioned ? "Yes" : "No"}
                       </span>
-                    </td>
-                    <td className="py-2 px-2 align-top" style={{ maxWidth: 80 }}>
-                      <span className="text-[10px] font-medium whitespace-normal leading-tight">{intentLabel}</span>
                     </td>
                     <td className="py-2 px-2 align-top">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-normal leading-tight ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
