@@ -115,6 +115,26 @@ serve(async (req) => {
 
     const pack = JSON.parse(result.toolCall.arguments);
 
+    // Match FlytBase partner by region
+    let matchedPartner: { name: string; email: string } | null = null;
+    const deploymentRegion = pack.companyProfile.deploymentRegion || "";
+    if (deploymentRegion) {
+      const { data: partners } = await supabase
+        .from("flytbase_partners")
+        .select("name, email, region");
+
+      if (partners && partners.length > 0) {
+        const regionLower = deploymentRegion.toLowerCase();
+        const match = partners.find((p: any) =>
+          regionLower.includes(p.region.toLowerCase()) ||
+          p.region.toLowerCase().includes(regionLower)
+        );
+        if (match) {
+          matchedPartner = { name: match.name, email: match.email };
+        }
+      }
+    }
+
     // Persist to DB
     const insertData: Record<string, unknown> = {
       article_url: url,
@@ -136,6 +156,8 @@ serve(async (req) => {
       opportunity_score: pack.bdOpportunityAssessment.opportunityScore,
       crm_ready_notes: pack.crmReadyNotes,
       raw_json: pack,
+      matched_partner_name: matchedPartner?.name || null,
+      matched_partner_email: matchedPartner?.email || null,
     };
 
     // Add batch reference if provided
@@ -157,7 +179,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ pack, dbId: dbRow?.id || null }),
+      JSON.stringify({ pack, dbId: dbRow?.id || null, matchedPartner }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

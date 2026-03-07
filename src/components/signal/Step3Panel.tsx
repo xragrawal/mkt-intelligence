@@ -23,7 +23,7 @@ interface EnrichedResult {
   status: LeadStatus;
   createdAt?: string;
   articleSource?: string | null;
-  // BD context from Step 2 scoring
+  matchedPartner?: { name: string; email: string } | null;
   scanContext?: {
     company?: string | null;
     partnerOrSI?: string | null;
@@ -34,7 +34,6 @@ interface EnrichedResult {
     confidence?: string;
     bdImpactScore?: number;
   };
-  // Batch reference
   batchRef?: {
     batchId?: string;
     keywords?: string[];
@@ -76,6 +75,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           dbId: row.id,
           status: (row.status as LeadStatus) || "open",
           createdAt: row.created_at,
+          matchedPartner: row.matched_partner_name ? { name: row.matched_partner_name, email: row.matched_partner_email } : null,
           batchRef: {
             batchId: row.batch_id || undefined,
             keywords: row.keywords || undefined,
@@ -165,6 +165,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             dbId: data.dbId,
             status: "open",
             createdAt: new Date().toISOString(),
+            matchedPartner: data.matchedPartner || null,
             scanContext: {
               company: sa.scan.company,
               partnerOrSI: sa.scan.partnerOrSI,
@@ -311,8 +312,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">#</th>
                 <th className="py-2 px-2 font-medium">Batch Ref</th>
                 <th className="py-2 px-2 font-medium">Company</th>
-                <th className="py-2 px-2 font-medium">Partner / SI</th>
+                <th className="py-2 px-2 font-medium">Involved Parties</th>
                 <th className="py-2 px-2 font-medium">Location</th>
+                <th className="py-2 px-2 font-medium">FlytBase Partner</th>
                 <th className="py-2 px-2 font-medium">Signal</th>
                 <th className="py-2 px-2 font-medium text-center">Units</th>
                 <th className="py-2 px-2 font-medium">Conf.</th>
@@ -360,6 +362,16 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                     </td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 100 }}>{partner}</td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 120 }}>
+                      {r.matchedPartner ? (
+                        <div className="space-y-0.5">
+                          <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
+                          <a href={`mailto:${r.matchedPartner.email}`} className="text-[10px] text-primary hover:underline">{r.matchedPartner.email}</a>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="py-2 px-2 align-top">
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">{intentLabel}</Badge>
                     </td>
@@ -423,7 +435,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             <div key={r.dbId || r.articleUrl} className="relative">
               {/* BD context summary bar */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border rounded-t-xl bg-muted/30 text-xs">
-                {sc?.partnerOrSI && <span className="text-foreground">🤝 {sc.partnerOrSI}</span>}
+                {sc?.partnerOrSI && <span className="text-foreground">🤝 Involved: {sc.partnerOrSI}</span>}
+                {r.matchedPartner && <span className="text-primary font-medium">🏢 FlytBase Partner: {r.matchedPartner.name}</span>}
                 {(sc?.city || sc?.country) && <span className="text-foreground">📍 {[sc?.city, sc?.country].filter(Boolean).join(", ")}</span>}
                 {sc?.unitsMentioned && <span className="text-foreground">📦 {sc.unitsMentioned} units</span>}
                 {sc?.buyingIntentType && (

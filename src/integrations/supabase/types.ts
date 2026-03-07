@@ -83,6 +83,30 @@ export type Database = {
         }
         Relationships: []
       }
+      flytbase_partners: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          region: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          region: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          region?: string
+        }
+        Relationships: []
+      }
       opportunity_packs: {
         Row: {
           article_source: string | null
@@ -101,6 +125,8 @@ export type Database = {
           inferred_industry: string | null
           keywords: string[] | null
           likely_buyer_type: string | null
+          matched_partner_email: string | null
+          matched_partner_name: string | null
           maturity_signal: string | null
           notes: string | null
           opportunity_score: number | null
@@ -131,6 +157,8 @@ export type Database = {
           inferred_industry?: string | null
           keywords?: string[] | null
           likely_buyer_type?: string | null
+          matched_partner_email?: string | null
+          matched_partner_name?: string | null
           maturity_signal?: string | null
           notes?: string | null
           opportunity_score?: number | null
@@ -161,6 +189,8 @@ export type Database = {
           inferred_industry?: string | null
           keywords?: string[] | null
           likely_buyer_type?: string | null
+          matched_partner_email?: string | null
+          matched_partner_name?: string | null
           maturity_signal?: string | null
           notes?: string | null
           opportunity_score?: number | null
