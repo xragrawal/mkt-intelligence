@@ -185,6 +185,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             status: "open",
             createdAt: new Date().toISOString(),
             matchedPartner: data.matchedPartner || null,
+            flytbaseMentioned: data.pack?.flytbaseMentioned || false,
             scanContext: {
               company: sa.scan.company,
               partnerOrSI: sa.scan.partnerOrSI,
