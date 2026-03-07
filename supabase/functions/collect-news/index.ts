@@ -319,7 +319,7 @@ serve(async (req) => {
         .select("id, url, title");
 
       const existingIds = new Set((existingArticles || []).map(a => a.id));
-      const existingUrls = new Set((existingArticles || []).map(a => a.url));
+      const existingUrls = new Set((existingArticles || []).map(a => normalizeUrl(a.url)));
       const existingContentWords = (existingArticles || []).map(a => getContentWords(a.title));
 
       const newArticles = toStore.filter(a => {
