@@ -22,28 +22,28 @@ export function Header() {
         </Link>
         <nav className="flex items-center gap-4">
           <Link
-25:             to="/partners"
-26:             className={`flex items-center gap-1.5 text-sm transition-colors ${
-27:               location.pathname === "/partners"
-28:                 ? "text-primary font-medium"
-29:                 : "text-muted-foreground hover:text-foreground"
-30:             }`}
-31:           >
-32:             <Users className="w-4 h-4" />
-33:             Partners
-34:           </Link>
-35:           <Link
-36:             to="/trends"
-37:             className={`flex items-center gap-1.5 text-sm transition-colors ${
-38:               location.pathname === "/trends"
-39:                 ? "text-primary font-medium"
-40:                 : "text-muted-foreground hover:text-foreground"
-41:             }`}
-42:           >
-43:             <TrendingUp className="w-4 h-4" />
-44:             Trends
-45:           </Link>
-46:           <span className="text-xs text-muted-foreground font-body">v1.0</span>
+            to="/partners"
+            className={`flex items-center gap-1.5 text-sm transition-colors ${
+              location.pathname === "/partners"
+                ? "text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Partners
+          </Link>
+          <Link
+            to="/trends"
+            className={`flex items-center gap-1.5 text-sm transition-colors ${
+              location.pathname === "/trends"
+                ? "text-primary font-medium"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Trends
+          </Link>
+          <span className="text-xs text-muted-foreground font-body">v1.0</span>
         </nav>
       </div>
     </header>
