@@ -404,9 +404,10 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 const sc = r.scanContext;
                 const location = [sc?.city, sc?.country].filter(Boolean).join(", ") || r.pack.companyProfile.deploymentRegion || "—";
                 const intentLabel = sc?.buyingIntentType ? SIGNAL_LABELS[sc.buyingIntentType as BuyingIntentType] || sc.buyingIntentType : r.pack.deploymentSignal.eventType || "—";
-                const confidence = sc?.confidence || "—";
-                const partner = sc?.partnerOrSI || "—";
+                const involvedParties = (r as any).scanContext?.involvedParties;
+                const partnerDisplay = involvedParties && involvedParties.length > 0 ? involvedParties.join(", ") : sc?.partnerOrSI || "—";
                 const units = sc?.unitsMentioned;
+                const dealValue = (r as any).scanContext?.dealValue;
 
                   return (
                   <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
