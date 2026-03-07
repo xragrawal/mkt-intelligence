@@ -249,7 +249,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
         </div>
       </div>
 
-      {/* Date range & region selector — only show region if Google News enabled */}
+      {/* Date range, region & LLM selector */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
@@ -281,6 +281,20 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
             </Select>
           </div>
         )}
+
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm text-muted-foreground">AI Model</label>
+          <select
+            value={provider}
+            onChange={(e) => setProvider(e.target.value as LLMProvider)}
+            className="bg-muted border border-border rounded-md px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {LLM_OPTIONS.map((opt) => (
+              <option key={opt.id} value={opt.id}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
 
         {/* Last run intelligence */}
         {lastRunInfo && (
