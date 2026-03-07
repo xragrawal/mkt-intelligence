@@ -416,6 +416,8 @@ serve(async (req) => {
           droppedByDedup: totalCollected - afterDedup,
           droppedByDateFilter: afterDedup - afterDateFilter,
           droppedByCap: Math.max(0, afterDateFilter - MAX_ARTICLES),
+          crossBatchDupes,
+          newArticles: newArticlesCount,
         },
         lastRunForKeywords: matchingLastRun ? {
           id: matchingLastRun.id,
