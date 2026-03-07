@@ -435,13 +435,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                         ].filter(Boolean);
                         const display = parties.length > 0 ? parties.join(", ") : "—";
                         return (
-                          <div>
-                            <div className="font-medium text-foreground break-words leading-tight line-clamp-2" title={display}>{display}</div>
-                            <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary hover:underline text-[10px] break-words leading-tight inline-flex items-center gap-0.5 mt-0.5">
-                              <span className="line-clamp-2">{r.articleTitle}</span>
-                              <ExternalLink className="w-2.5 h-2.5 shrink-0 opacity-0 group-hover:opacity-100 text-primary" />
-                            </a>
-                          </div>
+                          <div className="font-medium text-foreground break-words leading-tight line-clamp-2" title={display}>{display}</div>
                         );
                       })()}
                     </td>

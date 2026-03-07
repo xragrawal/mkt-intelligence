@@ -383,7 +383,20 @@ export function Step2Panel({
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-2 font-medium w-8"></th>
+                <th className="py-2 pr-2 font-medium w-8">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedArticles.length === filtered.length}
+                    onChange={() => {
+                      if (selectedArticles.length === filtered.length) {
+                        onSelectionChange([]);
+                      } else {
+                        onSelectionChange([...filtered]);
+                      }
+                    }}
+                    className="accent-primary"
+                  />
+                </th>
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
                 <th className="py-2 pr-2 font-medium w-20">Source</th>
