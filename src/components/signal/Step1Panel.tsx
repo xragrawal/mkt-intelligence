@@ -34,6 +34,7 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
   const [allFetched, setAllFetched] = useState<FetchedArticleSummary[]>([]);
   const [pipeline, setPipeline] = useState<PipelineBreakdown | null>(null);
   const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
+  const { provider, setProvider } = useLLMProvider();
 
   // Source toggles
   const [useGoogleNews, setUseGoogleNews] = useState(true);
