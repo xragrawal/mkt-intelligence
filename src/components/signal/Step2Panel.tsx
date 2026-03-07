@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
