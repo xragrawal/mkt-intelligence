@@ -362,7 +362,16 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                     </td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 100 }}>{partner}</td>
                     <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
-                    <td className="py-2 px-2 align-top">
+                    <td className="py-2 px-2 align-top" style={{ maxWidth: 120 }}>
+                      {r.matchedPartner ? (
+                        <div className="space-y-0.5">
+                          <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
+                          <a href={`mailto:${r.matchedPartner.email}`} className="text-[10px] text-primary hover:underline">{r.matchedPartner.email}</a>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0 whitespace-nowrap">{intentLabel}</Badge>
                     </td>
                     <td className="py-2 px-2 text-center tabular-nums text-foreground align-top">{units ?? "—"}</td>
