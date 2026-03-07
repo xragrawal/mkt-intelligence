@@ -85,8 +85,9 @@ const BATCH_SCORING_TOOL = {
               country: { type: ["string", "null"] },
               city: { type: ["string", "null"] },
               unitsMentioned: { type: ["number", "null"] },
-              involvedParties: { type: "array", items: { type: "string" }, description: "All meaningful party names involved (companies, agencies, contractors, partners). Can be 1 or more." },
+              involvedParties: { type: "array", items: { type: "string" }, description: "All meaningful party names involved (companies, agencies, contractors, partners). EXCLUDE DJI, Skydio, Autel, FlytBase." },
               dealValue: { type: ["string", "null"], description: "Dollar/monetary value mentioned in the article if applicable (e.g. '$2.5M', '€10 million'), null if none" },
+              pocName: { type: ["string", "null"], description: "Key person name mentioned in article with company/role, e.g. 'Jacob Armstrong @ DGS'. Null if none." },
               buyingIntentType: {
                 type: "string",
                 enum: ["LIVE_DEPLOYMENT", "CONTRACT_AWARD", "TENDER", "PARTNER_ANNOUNCEMENT", "EXPANSION", "FUNDING", "REGULATION", "OTHER"],
