@@ -115,6 +115,8 @@ export function Step1Panel({ onRunComplete, lastRun }: Step1PanelProps) {
           combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
           combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter;
           combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
+          combinedPipeline.crossBatchDupes += data.pipeline.crossBatchDupes || 0;
+          combinedPipeline.newArticles += data.pipeline.newArticles || 0;
         }
         if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
       }
