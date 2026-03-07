@@ -1,7 +1,7 @@
-// Shared LLM abstraction — supports Claude (Anthropic) and Gemini (Lovable AI Gateway)
-// Toggle the active provider by changing LLM_PROVIDER env var or the default below.
+// Shared LLM abstraction — supports Gemini Direct (Google AI), Lovable AI Gateway, and Claude (Anthropic)
+// Toggle the active provider by passing `provider` option or setting LLM_PROVIDER env var.
 
-export type LLMProvider = "claude" | "gemini";
+export type LLMProvider = "gemini_direct" | "lovable" | "claude";
 
 interface LLMCallOptions {
   systemPrompt: string;
@@ -21,8 +21,91 @@ interface LLMResult {
 
 function getProvider(): LLMProvider {
   const env = Deno.env.get("LLM_PROVIDER");
-  if (env === "gemini" || env === "claude") return env;
-  return "claude"; // default to Claude for now
+  if (env === "gemini_direct" || env === "lovable" || env === "claude") return env;
+  return "gemini_direct"; // default
+}
+
+// ── Gemini Direct (Google AI Studio / Generative Language API) ──
+
+function convertToolsToGeminiDirect(tools: any[]): any[] {
+  return tools.map((t) => ({
+    name: t.function.name,
+    description: t.function.description,
+    parameters: t.function.parameters,
+  }));
+}
+
+async function callGeminiDirect(opts: LLMCallOptions): Promise<LLMResult> {
+  const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
+  if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured");
+
+  const model = opts.model || "gemini-2.5-flash";
+
+  const contents: any[] = [];
+  
+  // System instruction is separate in Gemini API
+  const systemInstruction = { parts: [{ text: opts.systemPrompt }] };
+  
+  contents.push({ role: "user", parts: [{ text: opts.userMessage }] });
+
+  const body: any = {
+    contents,
+    system_instruction: systemInstruction,
+    generationConfig: {
+      maxOutputTokens: 16384,
+    },
+  };
+
+  if (opts.tools?.length) {
+    body.tools = [{
+      function_declarations: convertToolsToGeminiDirect(opts.tools),
+    }];
+    if (opts.toolChoice) {
+      // Force a specific function call
+      body.tool_config = {
+        function_calling_config: {
+          mode: "ANY",
+          allowed_function_names: opts.toolChoice?.function?.name ? [opts.toolChoice.function.name] : undefined,
+        },
+      };
+    }
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status === 429) throw new RateLimitError();
+  if (response.status === 402) throw new CreditsExhaustedError();
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("Gemini Direct error:", response.status, errText);
+    throw new Error("Gemini Direct API call failed: " + errText);
+  }
+
+  const data = await response.json();
+  
+  // Extract function call from Gemini response
+  const candidate = data.candidates?.[0];
+  const parts = candidate?.content?.parts || [];
+  
+  const fnCallPart = parts.find((p: any) => p.functionCall);
+  if (fnCallPart) {
+    return {
+      toolCall: {
+        name: fnCallPart.functionCall.name,
+        arguments: JSON.stringify(fnCallPart.functionCall.args),
+      },
+    };
+  }
+
+  // Extract text
+  const textPart = parts.find((p: any) => p.text);
+  return { content: textPart?.text || "" };
 }
 
 // ── Claude (Anthropic) ──
@@ -82,7 +165,6 @@ async function callClaude(opts: LLMCallOptions): Promise<LLMResult> {
 
   const data = await response.json();
 
-  // Extract tool use block
   const toolBlock = data.content?.find((b: any) => b.type === "tool_use");
   if (toolBlock) {
     return {
@@ -93,14 +175,13 @@ async function callClaude(opts: LLMCallOptions): Promise<LLMResult> {
     };
   }
 
-  // Extract text
   const textBlock = data.content?.find((b: any) => b.type === "text");
   return { content: textBlock?.text || "" };
 }
 
-// ── Gemini (Lovable AI Gateway) ──
+// ── Lovable AI Gateway ──
 
-async function callGemini(opts: LLMCallOptions): Promise<LLMResult> {
+async function callLovable(opts: LLMCallOptions): Promise<LLMResult> {
   const apiKey = Deno.env.get("LOVABLE_API_KEY");
   if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -132,8 +213,8 @@ async function callGemini(opts: LLMCallOptions): Promise<LLMResult> {
   if (response.status === 402) throw new CreditsExhaustedError();
   if (!response.ok) {
     const errText = await response.text();
-    console.error("Gemini error:", response.status, errText);
-    throw new Error("Gemini API call failed");
+    console.error("Lovable AI error:", response.status, errText);
+    throw new Error("Lovable AI Gateway call failed");
   }
 
   const data = await response.json();
@@ -160,7 +241,18 @@ export class CreditsExhaustedError extends Error {
   constructor() { super("AI credits exhausted. Please add credits."); }
 }
 
+export const LLM_PROVIDERS: { id: LLMProvider; label: string; model: string }[] = [
+  { id: "gemini_direct", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
+  { id: "lovable", label: "Lovable AI", model: "google/gemini-3-flash-preview" },
+  { id: "claude", label: "Claude Sonnet 4", model: "claude-sonnet-4-20250514" },
+];
+
 export async function callLLM(opts: LLMCallOptions): Promise<LLMResult> {
   const provider = opts.provider || getProvider();
-  return provider === "claude" ? callClaude(opts) : callGemini(opts);
+  switch (provider) {
+    case "gemini_direct": return callGeminiDirect(opts);
+    case "claude": return callClaude(opts);
+    case "lovable": return callLovable(opts);
+    default: return callGeminiDirect(opts);
+  }
 }
