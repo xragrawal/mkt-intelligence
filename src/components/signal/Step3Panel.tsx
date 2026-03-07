@@ -546,7 +546,31 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               {/* BD context summary bar */}
               <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border rounded-t-xl bg-muted/30 text-xs">
                 {sc?.partnerOrSI && <span className="text-foreground">🤝 Involved: {sc.partnerOrSI}</span>}
-                {r.matchedPartner && <span className="text-primary font-medium">🏢 FlytBase Partner: {r.matchedPartner.name}</span>}
+                {r.matchedPartner ? (
+                  <span className="text-primary font-medium inline-flex items-center gap-1">
+                    🏢 FlytBase Partner: {r.matchedPartner.name}
+                    <button onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)} className="text-muted-foreground hover:text-primary"><Edit2 className="w-3 h-3" /></button>
+                  </span>
+                ) : (
+                  <button onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)} className="text-muted-foreground hover:text-primary text-[11px] inline-flex items-center gap-1">
+                    🏢 Assign Partner <Edit2 className="w-3 h-3" />
+                  </button>
+                )}
+                {editingPartnerId === (r.dbId || r.articleUrl) && (
+                  <select
+                    className="text-[11px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
+                    defaultValue={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
+                    onChange={(e) => {
+                      const selected = allPartners.find(p => p.id === e.target.value);
+                      handlePartnerChange(r, selected || null);
+                    }}
+                  >
+                    <option value="">— None —</option>
+                    {allPartners.map(p => (
+                      <option key={p.id} value={p.id}>{p.name} ({p.region})</option>
+                    ))}
+                  </select>
+                )}
                 {(sc?.city || sc?.country) && <span className="text-foreground">📍 {[sc?.city, sc?.country].filter(Boolean).join(", ")}</span>}
                 {sc?.unitsMentioned && <span className="text-foreground">📦 {sc.unitsMentioned} units</span>}
                 {sc?.buyingIntentType && (
