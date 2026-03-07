@@ -179,7 +179,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ pack, dbId: dbRow?.id || null }),
+      JSON.stringify({ pack, dbId: dbRow?.id || null, matchedPartner }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
