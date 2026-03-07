@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
@@ -212,6 +212,48 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     toast.success("Opportunity pack removed");
   };
 
+  const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
+
+  const handleSendToPartner = async (result: EnrichedResult) => {
+    if (!result.matchedPartner) {
+      toast.error("No matched partner for this opportunity");
+      return;
+    }
+    const key = result.dbId || result.articleUrl;
+    setSendingEmailFor(key);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-partner-email", {
+        body: {
+          partnerName: result.matchedPartner.name,
+          partnerEmail: result.matchedPartner.email,
+          companyName: result.pack.companyProfile.companyName,
+          articleTitle: result.articleTitle,
+          articleUrl: result.articleUrl,
+          articleSource: result.articleSource,
+          deploymentRegion: result.pack.companyProfile.deploymentRegion,
+          inferredIndustry: result.pack.companyProfile.inferredIndustry,
+          eventType: result.pack.deploymentSignal.eventType,
+          whyThisIsHot: result.pack.bdOpportunityAssessment.whyThisIsHot,
+          strategicEntryPoint: result.pack.bdOpportunityAssessment.strategicEntryPoint,
+          partnershipAngle: result.pack.bdOpportunityAssessment.partnershipAngle,
+          opportunityScore: result.pack.bdOpportunityAssessment.opportunityScore,
+          crmReadyNotes: result.pack.crmReadyNotes,
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Email sent to ${result.matchedPartner.name}`);
+        await handleStatusChange(result, "shared_with_partners");
+      } else {
+        toast.error(data?.error || "Failed to send email");
+      }
+    } catch (e: any) {
+      toast.error("Email failed: " + e.message);
+    } finally {
+      setSendingEmailFor(null);
+    }
+  };
+
   const filteredResults = statusFilter === "all"
     ? results
     : results.filter((r) => r.status === statusFilter);
@@ -389,9 +431,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                             <Briefcase className="w-3 h-3" /> CRM
                           </Button>
                         )}
-                        {r.status !== "shared_with_partners" && (
+                         {r.status !== "shared_with_partners" && (
                           <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "shared_with_partners")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
                             <Users className="w-3 h-3" /> Partner
+                          </Button>
+                        )}
+                        {r.matchedPartner && (
+                          <Button variant="ghost" size="sm" onClick={() => handleSendToPartner(r)} disabled={sendingEmailFor === (r.dbId || r.articleUrl)} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary">
+                            {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email
                           </Button>
                         )}
                         {r.status !== "duplicate" && (
@@ -462,6 +509,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                   {r.status !== "acted_internally" && (
                     <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
                       <Briefcase className="w-3.5 h-3.5" /> Add to CRM
+                    </Button>
+                  )}
+                  {r.matchedPartner && (
+                    <Button variant="ghost" size="sm" onClick={() => handleSendToPartner(r)} disabled={sendingEmailFor === (r.dbId || r.articleUrl)} className="text-xs gap-1.5 text-muted-foreground hover:text-primary">
+                      {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Send to Partner
                     </Button>
                   )}
                   {r.status !== "duplicate" && (
