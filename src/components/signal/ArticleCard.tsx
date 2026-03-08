@@ -2,7 +2,7 @@ import { ExternalLink, CheckSquare, Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ScoredArticle, BuyingIntentType } from "@/lib/types";
 import { SIGNAL_LABELS } from "@/lib/types";
-import { SourceBadge } from "@/components/signal/SourceBadge";
+
 
 interface ArticleCardProps {
   scoredArticle: ScoredArticle;
