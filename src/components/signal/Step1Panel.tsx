@@ -560,7 +560,7 @@ function ArticleTableDialog({
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Title</th>
-                <th className="py-2 pr-2 font-medium w-20">Source</th>
+                
                 <th className="py-2 pr-2 font-medium w-28">Publisher</th>
                 <th className="py-2 pr-2 font-medium w-20">Keyword</th>
                 <th className="py-2 font-medium w-20">Published</th>
