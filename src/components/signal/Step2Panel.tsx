@@ -5,7 +5,7 @@ import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
-import { SourceBadge } from "@/components/signal/SourceBadge";
+
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
 import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE, resolveRegionsToCountries, CONTINENT_COUNTRY_MAP } from "@/lib/types";
 import { toast } from "sonner";
@@ -456,7 +456,7 @@ export function Step2Panel({
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Article</th>
                 <th className="py-2 pr-2 font-medium w-24">Use Case</th>
-                <th className="py-2 pr-2 font-medium w-20">Source</th>
+                
                 <th className="py-2 pr-2 font-medium" style={{ maxWidth: 140 }}>Involved Parties</th>
                 <th className="py-2 pr-2 font-medium w-16 text-center" title="Is FlytBase mentioned in the article?">FB Exist?</th>
                 <th className="py-2 pr-2 font-medium w-16">Value</th>
@@ -505,9 +505,6 @@ export function Step2Panel({
                       <span className="text-foreground text-[10px] leading-tight break-words line-clamp-2" title={sa.scan.useCaseCategory || "—"}>
                         {sa.scan.useCaseCategory || "—"}
                       </span>
-                    </td>
-                    <td className="py-2.5 pr-2">
-                      <SourceBadge source={sa.article.source || "google_news"} />
                     </td>
                     <td className="py-2.5 pr-2 text-foreground" style={{ maxWidth: 140 }}>
                       {(() => {

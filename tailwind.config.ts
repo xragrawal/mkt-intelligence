@@ -73,7 +73,6 @@ export default {
         },
         source: {
           gnews: "hsl(var(--source-gnews))",
-          linkedin: "hsl(var(--source-linkedin))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

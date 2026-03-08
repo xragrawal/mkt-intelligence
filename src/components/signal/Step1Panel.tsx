@@ -1,14 +1,12 @@
 import { useState, useMemo } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Linkedin, Filter, FilterX, Brain, Info } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Filter, FilterX, Brain, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS, CONTINENT_COUNTRY_MAP, CONTINENTS, resolveRegionsToCountries } from "@/lib/types";
 import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
-import { SourceBadge } from "@/components/signal/SourceBadge";
 import { useLLMProvider, LLM_OPTIONS, type LLMProvider } from "@/lib/llm-context";
 import { toast } from "sonner";
 
@@ -38,9 +36,7 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
   const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
   const { provider, setProvider } = useLLMProvider();
 
-  // Source toggles
-  const [useGoogleNews, setUseGoogleNews] = useState(true);
-  const [useLinkedIn, setUseLinkedIn] = useState(false);
+  const useGoogleNews = true;
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
@@ -57,10 +53,6 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
   const handleCollect = async () => {
     if (keywords.length === 0) {
       toast.error("Add at least one keyword");
-      return;
-    }
-    if (!useGoogleNews && !useLinkedIn) {
-      toast.error("Enable at least one source");
       return;
     }
 
@@ -126,62 +118,6 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
         if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
       }
 
-      // Run LinkedIn collection
-      if (useLinkedIn) {
-        try {
-          const liController = new AbortController();
-          const liTimeoutId = setTimeout(() => liController.abort(), 120000); // 2 min timeout
-          const liUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collect-linkedin`;
-          const liResp = await fetch(liUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({ keywords, filterDays }),
-            signal: liController.signal,
-          });
-          clearTimeout(liTimeoutId);
-
-          if (!liResp.ok) {
-            const errText = await liResp.text();
-            toast.error("LinkedIn collection failed: " + (errText || `HTTP ${liResp.status}`));
-          } else {
-            const data = await liResp.json();
-            if (data?.error) {
-              toast.error("LinkedIn: " + data.error);
-            } else {
-              // Merge LinkedIn results
-              if (!lastCompletedRun) lastCompletedRun = data.run;
-              else {
-                lastCompletedRun = {
-                  ...lastCompletedRun,
-                  articles_collected: lastCompletedRun.articles_collected + (data.run?.articles_collected || 0),
-                  articles_stored: lastCompletedRun.articles_stored + (data.run?.articles_stored || 0),
-                };
-              }
-              if (data.articles) allStoredArticles.push(...data.articles);
-              if (data.allFetched) allFetchedArticles.push(...data.allFetched);
-              if (data.pipeline) {
-                combinedPipeline.totalFetched += data.pipeline.totalFetched;
-                combinedPipeline.afterDedup += data.pipeline.afterDedup;
-                combinedPipeline.afterDateFilter += data.pipeline.afterDateFilter;
-                combinedPipeline.afterCap += data.pipeline.afterCap;
-                combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
-                combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter || 0;
-                combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
-                combinedPipeline.crossBatchDupes += data.pipeline.crossBatchDupes || 0;
-                combinedPipeline.newArticles += data.pipeline.newArticles || 0;
-              }
-              toast.success(`LinkedIn: ${data.run?.articles_stored || 0} articles stored`);
-            }
-          }
-        } catch (liErr: any) {
-          toast.error("LinkedIn collection failed: " + liErr.message);
-        }
-      }
-
       if (lastCompletedRun) {
         onRunComplete(lastCompletedRun);
         setStoredArticles(allStoredArticles);
@@ -207,26 +143,6 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
         </div>
       </div>
 
-      {/* Source toggles */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">Sources</label>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2.5 cursor-pointer group">
-            <Switch checked={useGoogleNews} onCheckedChange={setUseGoogleNews} />
-            <div className="flex items-center gap-1.5">
-              <Newspaper className="w-4 h-4 text-source-gnews" />
-              <span className={`text-sm ${useGoogleNews ? "text-foreground" : "text-muted-foreground"}`}>Google News</span>
-            </div>
-          </label>
-          <label className="flex items-center gap-2.5 cursor-pointer group">
-            <Switch checked={useLinkedIn} onCheckedChange={setUseLinkedIn} />
-            <div className="flex items-center gap-1.5">
-              <Linkedin className="w-4 h-4 text-source-linkedin" />
-              <span className={`text-sm ${useLinkedIn ? "text-foreground" : "text-muted-foreground"}`}>LinkedIn</span>
-            </div>
-          </label>
-        </div>
-      </div>
 
       {/* Keyword pills */}
       <div className="space-y-2">
@@ -375,7 +291,7 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
 
       {/* Action */}
       <div className="flex items-center gap-4">
-        <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0 || (!useGoogleNews && !useLinkedIn)} className="gap-2">
+        <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0} className="gap-2">
           {isCollecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Newspaper className="w-4 h-4" />}
           {isCollecting ? "Collecting…" : "Collect Latest News"}
         </Button>
@@ -644,7 +560,7 @@ function ArticleTableDialog({
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Title</th>
-                <th className="py-2 pr-2 font-medium w-20">Source</th>
+                
                 <th className="py-2 pr-2 font-medium w-28">Publisher</th>
                 <th className="py-2 pr-2 font-medium w-20">Keyword</th>
                 <th className="py-2 font-medium w-20">Published</th>
@@ -664,9 +580,6 @@ function ArticleTableDialog({
                       <span className="line-clamp-2">{a.title}</span>
                       <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
                     </a>
-                  </td>
-                  <td className="py-2 pr-2">
-                    {a.source === "linkedin" ? <SourceBadge source="linkedin" /> : <SourceBadge source="google_news" />}
                   </td>
                   <td className="py-2 pr-2 text-muted-foreground truncate max-w-[120px]">{a.publishing_agency || "—"}</td>
                   <td className="py-2 pr-2">
