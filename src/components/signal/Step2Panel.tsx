@@ -5,7 +5,7 @@ import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
-import { SourceBadge } from "@/components/signal/SourceBadge";
+
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
 import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE, resolveRegionsToCountries, CONTINENT_COUNTRY_MAP } from "@/lib/types";
 import { toast } from "sonner";
