@@ -55,10 +55,6 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
       toast.error("Add at least one keyword");
       return;
     }
-    if (!useGoogleNews && !useLinkedIn) {
-      toast.error("Enable at least one source");
-      return;
-    }
 
     setIsCollecting(true);
     setError(null);
