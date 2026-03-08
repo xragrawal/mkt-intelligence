@@ -118,62 +118,6 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
         if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
       }
 
-      // Run LinkedIn collection
-      if (useLinkedIn) {
-        try {
-          const liController = new AbortController();
-          const liTimeoutId = setTimeout(() => liController.abort(), 120000); // 2 min timeout
-          const liUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/collect-linkedin`;
-          const liResp = await fetch(liUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({ keywords, filterDays }),
-            signal: liController.signal,
-          });
-          clearTimeout(liTimeoutId);
-
-          if (!liResp.ok) {
-            const errText = await liResp.text();
-            toast.error("LinkedIn collection failed: " + (errText || `HTTP ${liResp.status}`));
-          } else {
-            const data = await liResp.json();
-            if (data?.error) {
-              toast.error("LinkedIn: " + data.error);
-            } else {
-              // Merge LinkedIn results
-              if (!lastCompletedRun) lastCompletedRun = data.run;
-              else {
-                lastCompletedRun = {
-                  ...lastCompletedRun,
-                  articles_collected: lastCompletedRun.articles_collected + (data.run?.articles_collected || 0),
-                  articles_stored: lastCompletedRun.articles_stored + (data.run?.articles_stored || 0),
-                };
-              }
-              if (data.articles) allStoredArticles.push(...data.articles);
-              if (data.allFetched) allFetchedArticles.push(...data.allFetched);
-              if (data.pipeline) {
-                combinedPipeline.totalFetched += data.pipeline.totalFetched;
-                combinedPipeline.afterDedup += data.pipeline.afterDedup;
-                combinedPipeline.afterDateFilter += data.pipeline.afterDateFilter;
-                combinedPipeline.afterCap += data.pipeline.afterCap;
-                combinedPipeline.droppedByDedup += data.pipeline.droppedByDedup;
-                combinedPipeline.droppedByDateFilter += data.pipeline.droppedByDateFilter || 0;
-                combinedPipeline.droppedByCap += data.pipeline.droppedByCap;
-                combinedPipeline.crossBatchDupes += data.pipeline.crossBatchDupes || 0;
-                combinedPipeline.newArticles += data.pipeline.newArticles || 0;
-              }
-              toast.success(`LinkedIn: ${data.run?.articles_stored || 0} articles stored`);
-            }
-          }
-        } catch (liErr: any) {
-          toast.error("LinkedIn collection failed: " + liErr.message);
-        }
-      }
-
       if (lastCompletedRun) {
         onRunComplete(lastCompletedRun);
         setStoredArticles(allStoredArticles);
