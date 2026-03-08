@@ -291,7 +291,7 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
 
       {/* Action */}
       <div className="flex items-center gap-4">
-        <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0 || (!useGoogleNews && !useLinkedIn)} className="gap-2">
+        <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0} className="gap-2">
           {isCollecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Newspaper className="w-4 h-4" />}
           {isCollecting ? "Collecting…" : "Collect Latest News"}
         </Button>
