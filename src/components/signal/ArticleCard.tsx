@@ -59,7 +59,7 @@ export function ArticleCard({ scoredArticle, selected, onToggle }: ArticleCardPr
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <SourceBadge source={article.source || "google_news"} />
+            
             <Badge variant="outline" className={`border ${intentBgClass[scan.buyingIntentType]} text-xs px-2 py-0.5`}>
               {SIGNAL_LABELS[scan.buyingIntentType]}
             </Badge>
