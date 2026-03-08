@@ -581,9 +581,6 @@ function ArticleTableDialog({
                       <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
                     </a>
                   </td>
-                  <td className="py-2 pr-2">
-                    {a.source === "linkedin" ? <SourceBadge source="linkedin" /> : <SourceBadge source="google_news" />}
-                  </td>
                   <td className="py-2 pr-2 text-muted-foreground truncate max-w-[120px]">{a.publishing_agency || "—"}</td>
                   <td className="py-2 pr-2">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">{a.keyword}</Badge>

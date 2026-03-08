@@ -1,13 +1,11 @@
-export type ArticleSource = "google_news" | "linkedin";
+export type ArticleSource = "google_news";
 
 export const SOURCE_LABELS: Record<ArticleSource, string> = {
   google_news: "Google News",
-  linkedin: "LinkedIn",
 };
 
 export const SOURCE_COLORS: Record<ArticleSource, string> = {
   google_news: "bg-source-gnews/15 text-source-gnews border-source-gnews/30",
-  linkedin: "bg-source-linkedin/15 text-source-linkedin border-source-linkedin/30",
 };
 
 export interface CollectedArticle {
