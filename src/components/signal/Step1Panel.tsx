@@ -143,26 +143,6 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
         </div>
       </div>
 
-      {/* Source toggles */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">Sources</label>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2.5 cursor-pointer group">
-            <Switch checked={useGoogleNews} onCheckedChange={setUseGoogleNews} />
-            <div className="flex items-center gap-1.5">
-              <Newspaper className="w-4 h-4 text-source-gnews" />
-              <span className={`text-sm ${useGoogleNews ? "text-foreground" : "text-muted-foreground"}`}>Google News</span>
-            </div>
-          </label>
-          <label className="flex items-center gap-2.5 cursor-pointer group">
-            <Switch checked={useLinkedIn} onCheckedChange={setUseLinkedIn} />
-            <div className="flex items-center gap-1.5">
-              <Linkedin className="w-4 h-4 text-source-linkedin" />
-              <span className={`text-sm ${useLinkedIn ? "text-foreground" : "text-muted-foreground"}`}>LinkedIn</span>
-            </div>
-          </label>
-        </div>
-      </div>
 
       {/* Keyword pills */}
       <div className="space-y-2">
