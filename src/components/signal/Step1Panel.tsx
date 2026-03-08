@@ -36,9 +36,7 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
   const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
   const { provider, setProvider } = useLLMProvider();
 
-  // Source toggles
-  const [useGoogleNews, setUseGoogleNews] = useState(true);
-  const [useLinkedIn, setUseLinkedIn] = useState(false);
+  const useGoogleNews = true;
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
