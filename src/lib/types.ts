@@ -1,11 +1,15 @@
-export type ArticleSource = "google_news";
+export type ArticleSource = "google_news" | "linkedin" | "facebook";
 
 export const SOURCE_LABELS: Record<ArticleSource, string> = {
   google_news: "Google News",
+  linkedin: "LinkedIn",
+  facebook: "Facebook",
 };
 
 export const SOURCE_COLORS: Record<ArticleSource, string> = {
   google_news: "bg-source-gnews/15 text-source-gnews border-source-gnews/30",
+  linkedin: "bg-source-linkedin/15 text-source-linkedin border-source-linkedin/30",
+  facebook: "bg-[#1877F2]/15 text-[#1877F2] border-[#1877F2]/30",
 };
 
 export interface CollectedArticle {
@@ -176,7 +180,7 @@ export const CONTINENT_COUNTRY_MAP: Record<string, string[]> = {
   "Asia Pacific": ["India", "Japan", "South Korea", "Singapore", "Indonesia", "China", "Australia"],
   "Middle East": ["Saudi Arabia", "UAE"],
   "Africa": ["South Africa", "Nigeria"],
-  "South America": ["Brazil"],
+  "South America": ["Brazil", "Argentina", "Chile", "Colombia"],
 };
 
 export const NEWS_REGIONS = [
@@ -203,6 +207,9 @@ export const NEWS_REGIONS = [
   "Italy",
   "Mexico",
   "Brazil",
+  "Argentina",
+  "Chile",
+  "Colombia",
   "Japan",
   "South Korea",
   "Indonesia",

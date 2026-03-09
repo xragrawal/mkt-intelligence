@@ -319,10 +319,15 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
       </div>
 
       {/* Action bar */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 pt-4">
         {enabled && (
-          <Button onClick={handleDeepDive} disabled={isEnriching || !enabled || selectedArticles.length === 0} className="gap-2">
-            {isEnriching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          <Button
+            onClick={handleDeepDive}
+            disabled={isEnriching || !enabled || selectedArticles.length === 0}
+            size="lg"
+            className="gap-2 font-semibold"
+          >
+            {isEnriching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
             {isEnriching
               ? `Analysing ${currentIndex}/${selectedArticles.length}…`
               : `Deep Dive (${selectedArticles.length})`}
@@ -561,12 +566,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 )}
                 {editingPartnerId === (r.dbId || r.articleUrl) && (
                   <select
+                    key={`partner-select-${r.dbId || r.articleUrl}`}
                     className="text-[11px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
-                    defaultValue={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
+                    value={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
                     onChange={(e) => {
                       const selected = allPartners.find(p => p.id === e.target.value);
                       handlePartnerChange(r, selected || null);
                     }}
+                    autoFocus
                   >
                     <option value="">— None —</option>
                     {allPartners.map(p => (

@@ -14,8 +14,18 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Space Grotesk", "system-ui", "sans-serif"],
+        display: ["Montserrat", "system-ui", "sans-serif"],
         body: ["Inter", "system-ui", "sans-serif"],
+      },
+      fontSize: {
+        xs: ["0.875rem", { lineHeight: "1.5rem" }],
+        sm: ["1rem", { lineHeight: "1.5rem" }],
+        base: ["1.0625rem", { lineHeight: "1.6rem" }],
+        lg: ["1.25rem", { lineHeight: "1.75rem" }],
+        xl: ["1.375rem", { lineHeight: "1.75rem" }],
+        "2xl": ["1.625rem", { lineHeight: "2rem" }],
+        "3xl": ["2rem", { lineHeight: "2.25rem" }],
+        "4xl": ["2.5rem", { lineHeight: "2.5rem" }],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -73,6 +83,8 @@ export default {
         },
         source: {
           gnews: "hsl(var(--source-gnews))",
+          linkedin: "#0A66C2",
+          facebook: "#1877F2",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

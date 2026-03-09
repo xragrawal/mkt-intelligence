@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vite-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8080
+    },
+    {
+      "name": "linkedin-server",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "server/linkedin-server.ts"],
+      "port": 3001
+    }
+  ]
+}

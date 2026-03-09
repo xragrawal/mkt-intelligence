@@ -11,6 +11,20 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      "/api/collect-linkedin": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/api/collect-facebook": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+      "/api/health": {
+        target: "http://localhost:3001",
+        changeOrigin: true,
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Social media cookies (sensitive — never commit)
+linkedin-cookies.json
+linkedin_cookie.json
+facebook-cookies.json
+
+# Debug files
+debug/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

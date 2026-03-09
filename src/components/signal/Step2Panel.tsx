@@ -251,9 +251,14 @@ export function Step2Panel({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={handleScore} disabled={isScoring || disabled || articlesToScore === 0} className="gap-2">
-          {isScoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+      <div className="flex flex-wrap items-center gap-3 pt-4">
+        <Button
+          onClick={handleScore}
+          disabled={isScoring || disabled || articlesToScore === 0}
+          size="lg"
+          className="gap-2 font-semibold"
+        >
+          {isScoring ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
           {isScoring
             ? `Scoring… (${progress.current}/${progress.total})`
             : `Score ${articlesToScore} Articles`}

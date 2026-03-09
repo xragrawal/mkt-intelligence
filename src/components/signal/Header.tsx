@@ -20,13 +20,13 @@ export function Header() {
             </p>
           </div>
         </Link>
-        <nav className="flex items-center gap-4">
+        <nav className="flex items-center gap-6">
           <Link
             to="/partners"
-            className={`flex items-center gap-1.5 text-sm transition-colors ${
+            className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
               location.pathname === "/partners"
-                ? "text-primary font-medium"
-                : "text-muted-foreground hover:text-foreground"
+                ? "text-primary"
+                : "text-foreground hover:text-primary"
             }`}
           >
             <Users className="w-4 h-4" />
@@ -34,16 +34,16 @@ export function Header() {
           </Link>
           <Link
             to="/trends"
-            className={`flex items-center gap-1.5 text-sm transition-colors ${
+            className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
               location.pathname === "/trends"
-                ? "text-primary font-medium"
-                : "text-muted-foreground hover:text-foreground"
+                ? "text-primary"
+                : "text-foreground hover:text-primary"
             }`}
           >
             <TrendingUp className="w-4 h-4" />
             Trends
           </Link>
-          <span className="text-xs text-muted-foreground font-body">v1.0</span>
+          <span className="text-xs text-foreground/60 font-body ml-4">v1.0</span>
         </nav>
       </div>
     </header>

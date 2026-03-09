@@ -1,76 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
-
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 210 20% 92%;
+    /* Flytbase Brand Colors */
+    --background: 220 28% 8%;
+    --foreground: 210 20% 98%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 210 20% 92%;
+    --card: 220 25% 11%;
+    --card-foreground: 210 20% 98%;
 
-    --popover: 220 18% 12%;
-    --popover-foreground: 210 20% 92%;
+    --popover: 220 25% 13%;
+    --popover-foreground: 210 20% 98%;
 
-    --primary: 160 70% 45%;
-    --primary-foreground: 220 20% 7%;
+    /* Primary Blue from Flytbase brand (#2C7BF2) */
+    --primary: 214 98% 60%;
+    --primary-foreground: 220 28% 8%;
 
-    --secondary: 220 15% 16%;
-    --secondary-foreground: 210 15% 75%;
+    --secondary: 220 20% 22%;
+    --secondary-foreground: 210 15% 85%;
 
-    --muted: 220 15% 14%;
-    --muted-foreground: 215 12% 50%;
+    --muted: 220 20% 18%;
+    --muted-foreground: 215 12% 68%;
 
-    --accent: 220 15% 18%;
-    --accent-foreground: 210 20% 88%;
+    --accent: 39 100% 53%;
+    --accent-foreground: 220 28% 8%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 80% 55%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 16%;
-    --ring: 160 70% 45%;
+    --border: 220 20% 24%;
+    --input: 220 20% 20%;
+    --ring: 214 98% 60%;
 
     --radius: 0.625rem;
 
-    /* Signal type colors */
-    --signal-deployment: 145 65% 42%;
-    --signal-contract: 210 80% 55%;
-    --signal-tender: 45 90% 55%;
-    --signal-partner: 280 60% 60%;
-    --signal-expansion: 175 65% 45%;
-    --signal-funding: 25 90% 55%;
-    --signal-regulation: 220 10% 55%;
-    --signal-other: 220 10% 40%;
+    /* Signal type colors - Improved contrast */
+    --signal-deployment: 145 75% 48%;
+    --signal-contract: 210 90% 62%;
+    --signal-tender: 45 95% 62%;
+    --signal-partner: 280 70% 65%;
+    --signal-expansion: 175 75% 52%;
+    --signal-funding: 25 95% 62%;
+    --signal-regulation: 220 15% 65%;
+    --signal-other: 220 10% 55%;
 
-    /* Urgency colors */
-    --urgency-high: 0 72% 55%;
-    --urgency-medium: 45 90% 55%;
-    --urgency-low: 220 10% 50%;
+    /* Urgency colors - Improved contrast */
+    --urgency-high: 0 85% 60%;
+    --urgency-medium: 45 95% 60%;
+    --urgency-low: 220 12% 62%;
 
     /* Confidence */
-    --confidence-high: 160 70% 45%;
-    --confidence-medium: 45 90% 55%;
-    --confidence-low: 220 10% 50%;
+    --confidence-high: 160 75% 50%;
+    --confidence-medium: 45 95% 60%;
+    --confidence-low: 220 12% 62%;
 
     /* Source colors */
-    --source-gnews: 210 80% 55%;
+    --source-gnews: 210 90% 62%;
 
     /* Custom */
-    --glow-primary: 160 70% 45%;
+    --glow-primary: 214 98% 60%;
     --surface-elevated: 220 18% 13%;
 
-    --sidebar-background: 220 20% 7%;
-    --sidebar-foreground: 210 20% 92%;
-    --sidebar-primary: 160 70% 45%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 15% 18%;
-    --sidebar-accent-foreground: 210 20% 88%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 160 70% 45%;
+    --sidebar-background: 220 28% 8%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 214 98% 60%;
+    --sidebar-primary-foreground: 220 28% 8%;
+    --sidebar-accent: 39 100% 53%;
+    --sidebar-accent-foreground: 220 28% 8%;
+    --sidebar-border: 220 20% 24%;
+    --sidebar-ring: 214 98% 60%;
   }
 }
 
@@ -81,10 +83,112 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    font-size: 1.0625rem;
+    letter-spacing: 0.3px;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-display;
+  h1 {
+    @apply font-display font-bold;
+    font-size: 2.25rem;
+    line-height: 2.5rem;
+    letter-spacing: -0.5px;
+  }
+
+  h2 {
+    @apply font-display font-bold;
+    font-size: 2.125rem;
+    line-height: 2.5rem;
+    letter-spacing: -0.3px;
+  }
+
+  h3 {
+    @apply font-display font-semibold;
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+  }
+
+  h4 {
+    @apply font-display font-semibold;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+
+  h5, h6 {
+    @apply font-display font-semibold;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+
+  p {
+    line-height: 1.6;
+  }
+
+  /* Responsive scaling for larger screens and projectors */
+  @media (min-width: 1920px) {
+    body {
+      font-size: 1.1875rem;
+    }
+
+    h1 {
+      font-size: 2.75rem;
+    }
+
+    h2 {
+      font-size: 2.375rem;
+    }
+
+    h3 {
+      font-size: 2rem;
+    }
+
+    h4 {
+      font-size: 1.5rem;
+    }
+  }
+
+  /* Extra large screens (projector-friendly) */
+  @media (min-width: 2560px) {
+    body {
+      font-size: 1.5rem;
+    }
+
+    h1 {
+      font-size: 3.5rem;
+      line-height: 4rem;
+    }
+
+    h2 {
+      font-size: 3rem;
+      line-height: 3.5rem;
+    }
+
+    h3 {
+      font-size: 2.5rem;
+      line-height: 3rem;
+    }
+
+    h4 {
+      font-size: 2rem;
+    }
+
+    .px-4 {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+
+    .px-6 {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+
+    .py-4 {
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
+    }
+
+    .gap-4 {
+      gap: 1.5rem;
+    }
   }
 }
 
@@ -98,5 +202,55 @@
       hsl(var(--primary)) var(--score-pct),
       hsl(var(--muted)) var(--score-pct)
     );
+  }
+
+  /* Enhanced text contrast utilities */
+  .text-label {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  .text-caption {
+    @apply text-xs font-medium text-muted-foreground;
+  }
+
+  .text-hint {
+    @apply text-xs font-normal text-muted-foreground;
+  }
+
+  /* Improved readability for small text */
+  .text-xs {
+    @apply tracking-wide;
+  }
+
+  /* Focus states with better visibility */
+  .focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2;
+  }
+
+  /* Better button text contrast */
+  .btn-text {
+    @apply font-medium tracking-tight;
+  }
+
+  /* Improved link visibility */
+  a:not([class*="btn"]) {
+    @apply text-primary hover:text-primary/80 transition-colors;
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: more) {
+    :root {
+      --muted-foreground: 215 12% 75%;
+      --foreground: 210 20% 99%;
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }

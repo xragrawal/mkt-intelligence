@@ -13,33 +13,40 @@ const Index = () => {
   const [step2Done, setStep2Done] = useState(false);
   const [selectedRegions, setSelectedRegions] = useState<string[]>(["Global"]);
 
+
   return (
     <LLMProviderProvider>
       <div className="min-h-screen bg-background">
         <Header />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-          <Step1Panel
-            onRunComplete={setCollectionRun}
-            lastRun={collectionRun}
-            selectedRegions={selectedRegions}
-            onRegionsChange={setSelectedRegions}
-          />
-          <Step2Panel
-            collectionRun={collectionRun}
-            scoredArticles={scoredArticles}
-            onArticlesScored={(articles) => {
-              setScoredArticles(articles);
-              setStep2Done(true);
-            }}
-            selectedArticles={selectedArticles}
-            onSelectionChange={setSelectedArticles}
-            selectedRegions={selectedRegions}
-          />
-          <Step3Panel
-            selectedArticles={selectedArticles}
-            enabled={step2Done && selectedArticles.length > 0}
-            collectionRun={collectionRun}
-          />
+          <div id="step-1">
+            <Step1Panel
+              onRunComplete={setCollectionRun}
+              lastRun={collectionRun}
+              selectedRegions={selectedRegions}
+              onRegionsChange={setSelectedRegions}
+            />
+          </div>
+          <div id="step-2">
+            <Step2Panel
+              collectionRun={collectionRun}
+              scoredArticles={scoredArticles}
+              onArticlesScored={(articles) => {
+                setScoredArticles(articles);
+                setStep2Done(true);
+              }}
+              selectedArticles={selectedArticles}
+              onSelectionChange={setSelectedArticles}
+              selectedRegions={selectedRegions}
+            />
+          </div>
+          <div id="step-3">
+            <Step3Panel
+              selectedArticles={selectedArticles}
+              enabled={step2Done && selectedArticles.length > 0}
+              collectionRun={collectionRun}
+            />
+          </div>
         </main>
       </div>
     </LLMProviderProvider>

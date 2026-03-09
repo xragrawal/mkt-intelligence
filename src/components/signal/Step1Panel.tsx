@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Filter, FilterX, Brain, Info } from "lucide-react";
+import { Newspaper, Loader2, CheckCircle2, AlertCircle, X, Plus, Table2, ExternalLink, Clock, CalendarDays, Globe, Filter, FilterX, Brain, Info, Linkedin, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,6 +9,15 @@ import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES
 import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
 import { useLLMProvider, LLM_OPTIONS, type LLMProvider } from "@/lib/llm-context";
 import { toast } from "sonner";
+
+// Source configuration - future-proof for adding more sources
+const AVAILABLE_SOURCES = {
+  google_news: { id: "google_news", label: "Google News", icon: Newspaper },
+  linkedin: { id: "linkedin", label: "LinkedIn", icon: Linkedin },
+  facebook: { id: "facebook", label: "Facebook", icon: Facebook },
+} as const;
+
+type SourceId = keyof typeof AVAILABLE_SOURCES;
 
 interface Step1PanelProps {
   onRunComplete: (run: CollectionRunSummary) => void;
@@ -36,7 +45,22 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
   const [lastRunInfo, setLastRunInfo] = useState<LastRunInfo | null>(null);
   const { provider, setProvider } = useLLMProvider();
 
-  const useGoogleNews = true;
+  // Source selection state - default to Google News enabled
+  const [selectedSources, setSelectedSources] = useState<SourceId[]>(["google_news"]);
+
+  const toggleSource = (sourceId: SourceId) => {
+    setSelectedSources((prev) =>
+      prev.includes(sourceId) ? prev.filter((id) => id !== sourceId) : [...prev, sourceId]
+    );
+  };
+
+  const selectAllSources = () => {
+    setSelectedSources(Object.keys(AVAILABLE_SOURCES) as SourceId[]);
+  };
+
+  const useGoogleNews = selectedSources.includes("google_news");
+  const useLinkedIn = selectedSources.includes("linkedin");
+  const useFacebook = selectedSources.includes("facebook");
 
   const addKeyword = () => {
     const trimmed = inputValue.trim();
@@ -53,6 +77,10 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
   const handleCollect = async () => {
     if (keywords.length === 0) {
       toast.error("Add at least one keyword");
+      return;
+    }
+    if (selectedSources.length === 0) {
+      toast.error("Select at least one data source");
       return;
     }
 
@@ -118,6 +146,96 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
         if (data.lastRunForKeywords) setLastRunInfo(data.lastRunForKeywords);
       }
 
+      // Run LinkedIn collection (additive — does not affect Google News)
+      if (useLinkedIn) {
+        try {
+          const liController = new AbortController();
+          const liTimeoutId = setTimeout(() => liController.abort(), 300000); // 5 min timeout for scraping
+
+          const liUrl = `/api/collect-linkedin`;
+          const liResp = await fetch(liUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keywords, filterDays }),
+            signal: liController.signal,
+          });
+          clearTimeout(liTimeoutId);
+
+          if (!liResp.ok) {
+            const errText = await liResp.text();
+            console.warn("LinkedIn collection failed:", errText);
+            toast.warning("LinkedIn collection failed — Google News results still available");
+          } else {
+            const liData = await liResp.json();
+
+            if (liData?.run) {
+              lastCompletedRun = liData.run;
+            }
+            if (liData?.articles) allStoredArticles.push(...liData.articles);
+            if (liData?.allFetched) allFetchedArticles.push(...liData.allFetched);
+            if (liData?.pipeline) {
+              combinedPipeline.totalFetched += liData.pipeline.totalFetched;
+              combinedPipeline.afterDedup += liData.pipeline.afterDedup;
+              combinedPipeline.afterDateFilter += liData.pipeline.afterDateFilter;
+              combinedPipeline.afterCap += liData.pipeline.afterCap;
+              combinedPipeline.droppedByDedup += liData.pipeline.droppedByDedup;
+              combinedPipeline.droppedByDateFilter += liData.pipeline.droppedByDateFilter;
+              combinedPipeline.droppedByCap += liData.pipeline.droppedByCap;
+              combinedPipeline.crossBatchDupes += liData.pipeline.crossBatchDupes || 0;
+              combinedPipeline.newArticles += liData.pipeline.newArticles || 0;
+            }
+          }
+        } catch (liErr: any) {
+          console.warn("LinkedIn collection error:", liErr.message);
+          toast.warning("LinkedIn scraping unavailable — is the social media server running? (npm run social-media:server)");
+        }
+      }
+
+      // Run Facebook collection (additive — does not affect Google News or LinkedIn)
+      if (useFacebook) {
+        try {
+          const fbController = new AbortController();
+          const fbTimeoutId = setTimeout(() => fbController.abort(), 300000); // 5 min timeout for scraping
+
+          const fbUrl = `/api/collect-facebook`;
+          const fbResp = await fetch(fbUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keywords, filterDays }),
+            signal: fbController.signal,
+          });
+          clearTimeout(fbTimeoutId);
+
+          if (!fbResp.ok) {
+            const errText = await fbResp.text();
+            console.warn("Facebook collection failed:", errText);
+            toast.warning("Facebook collection failed — other sources still available");
+          } else {
+            const fbData = await fbResp.json();
+
+            if (fbData?.run) {
+              lastCompletedRun = fbData.run;
+            }
+            if (fbData?.articles) allStoredArticles.push(...fbData.articles);
+            if (fbData?.allFetched) allFetchedArticles.push(...fbData.allFetched);
+            if (fbData?.pipeline) {
+              combinedPipeline.totalFetched += fbData.pipeline.totalFetched;
+              combinedPipeline.afterDedup += fbData.pipeline.afterDedup;
+              combinedPipeline.afterDateFilter += fbData.pipeline.afterDateFilter;
+              combinedPipeline.afterCap += fbData.pipeline.afterCap;
+              combinedPipeline.droppedByDedup += fbData.pipeline.droppedByDedup;
+              combinedPipeline.droppedByDateFilter += fbData.pipeline.droppedByDateFilter;
+              combinedPipeline.droppedByCap += fbData.pipeline.droppedByCap;
+              combinedPipeline.crossBatchDupes += fbData.pipeline.crossBatchDupes || 0;
+              combinedPipeline.newArticles += fbData.pipeline.newArticles || 0;
+            }
+          }
+        } catch (fbErr: any) {
+          console.warn("Facebook collection error:", fbErr.message);
+          toast.warning("Facebook scraping unavailable — is the social media server running? (npm run social-media:server)");
+        }
+      }
+
       if (lastCompletedRun) {
         onRunComplete(lastCompletedRun);
         setStoredArticles(allStoredArticles);
@@ -143,10 +261,12 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
         </div>
       </div>
 
-
       {/* Keyword pills */}
       <div className="space-y-2">
-        <label className="text-sm font-medium text-muted-foreground">Keywords</label>
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-muted-foreground">Keywords</label>
+          <span className="text-xs text-muted-foreground/70">(each keyword searched as phrase, e.g., "DJI Dock" stays together)</span>
+        </div>
         <div className="flex flex-wrap gap-2">
           {keywords.map((kw) => (
             <Badge key={kw} variant="secondary" className="pl-3 pr-1.5 py-1.5 text-sm font-body gap-1.5">
@@ -169,6 +289,47 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Source selection */}
+      <div className="space-y-3 bg-muted/40 rounded-lg p-4 border border-border/50">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-semibold text-foreground">Data Sources</label>
+          {selectedSources.length < Object.keys(AVAILABLE_SOURCES).length && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={selectAllSources}
+              className="text-xs text-primary hover:text-primary/80 h-6 px-2"
+            >
+              Select all
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-row gap-3">
+          {(Object.entries(AVAILABLE_SOURCES) as [SourceId, typeof AVAILABLE_SOURCES[SourceId]][]).map(([sourceId, source]) => {
+            const IconComponent = source.icon;
+            return (
+              <label
+                key={sourceId}
+                className="flex items-center gap-3 p-3 bg-card rounded-md border border-border cursor-pointer hover:bg-muted/50 transition-colors shrink-0"
+              >
+                <Checkbox
+                  checked={selectedSources.includes(sourceId)}
+                  onCheckedChange={() => toggleSource(sourceId)}
+                  className="w-5 h-5"
+                />
+                <IconComponent className="w-4 h-4 text-primary shrink-0" />
+                <span className="text-sm font-medium text-foreground">{source.label}</span>
+              </label>
+            );
+          })}
+        </div>
+        {selectedSources.length === 0 && (
+          <p className="text-xs text-destructive/80 bg-destructive/10 rounded-md px-3 py-2">
+            Select at least one data source
+          </p>
+        )}
       </div>
 
       {/* Date range, region & LLM selector */}
@@ -275,6 +436,18 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
           </select>
         </div>
 
+        {useLinkedIn && (
+          <span className="text-[10px] text-muted-foreground/70 inline-flex items-center gap-1">
+            <Linkedin className="w-3 h-3" /> LinkedIn requires local server (npm run social-media:server)
+          </span>
+        )}
+
+        {useFacebook && (
+          <span className="text-[10px] text-muted-foreground/70 inline-flex items-center gap-1">
+            <Facebook className="w-3 h-3" /> Facebook requires local server (npm run social-media:server)
+          </span>
+        )}
+
         {/* Last run intelligence */}
         {lastRunInfo && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5">
@@ -290,9 +463,14 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
       </div>
 
       {/* Action */}
-      <div className="flex items-center gap-4">
-        <Button onClick={handleCollect} disabled={isCollecting || keywords.length === 0} className="gap-2">
-          {isCollecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Newspaper className="w-4 h-4" />}
+      <div className="flex items-center gap-4 pt-4">
+        <Button
+          onClick={handleCollect}
+          disabled={isCollecting || keywords.length === 0 || selectedSources.length === 0}
+          size="lg"
+          className="gap-2 font-semibold"
+        >
+          {isCollecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Newspaper className="w-5 h-5" />}
           {isCollecting ? "Collecting…" : "Collect Latest News"}
         </Button>
         {error && (
