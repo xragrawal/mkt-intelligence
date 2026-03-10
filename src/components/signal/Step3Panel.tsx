@@ -303,33 +303,38 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
 
   const handleSendToPartner = async (result: EnrichedResult) => {
     if (!result.matchedPartner) {
-      toast.error("No matched partner for this opportunity");
+      toast.error("No contact assigned — assign one first");
       return;
     }
     const key = result.dbId || result.articleUrl;
     setSendingEmailFor(key);
     try {
+      const sc = result.scanContext;
       const { data, error } = await supabase.functions.invoke("send-partner-email", {
         body: {
+          // Recipient
           partnerName: result.matchedPartner.name,
           partnerEmail: result.matchedPartner.email,
+          // Prospect context
+          pocName: sc?.pocName || null,
           companyName: result.pack.companyProfile.companyName,
+          inferredIndustry: result.pack.companyProfile.inferredIndustry,
+          deploymentRegion: result.pack.companyProfile.deploymentRegion,
+          country: sc?.country || null,
+          eventType: result.pack.deploymentSignal.eventType,
+          involvedParties: sc?.involvedParties || [],
+          unitsMentioned: sc?.unitsMentioned || null,
+          // Article
           articleTitle: result.articleTitle,
           articleUrl: result.articleUrl,
-          articleSource: result.articleSource,
-          deploymentRegion: result.pack.companyProfile.deploymentRegion,
-          inferredIndustry: result.pack.companyProfile.inferredIndustry,
-          eventType: result.pack.deploymentSignal.eventType,
+          // AI intelligence
           whyThisIsHot: result.pack.bdOpportunityAssessment.whyThisIsHot,
           strategicEntryPoint: result.pack.bdOpportunityAssessment.strategicEntryPoint,
-          partnershipAngle: result.pack.bdOpportunityAssessment.partnershipAngle,
-          opportunityScore: result.pack.bdOpportunityAssessment.opportunityScore,
-          crmReadyNotes: result.pack.crmReadyNotes,
         },
       });
       if (error) throw error;
       if (data?.success) {
-        toast.success(`Email sent to ${result.matchedPartner.name}`);
+        toast.success(`Prospect email sent to ${result.matchedPartner.name}`);
         await handleStatusChange(result, "shared_with_partners");
       } else {
         toast.error(data?.error || "Failed to send email");
@@ -501,7 +506,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               onClick={() => {
                 if (!r.matchedPartner) {
                   setEditingPartnerId(r.dbId || r.articleUrl);
-                  toast.info("Assign a partner first, then click Email Partner");
+                  toast.info("Assign a contact first, then click Email Prospect");
                 } else {
                   handleSendToPartner(r);
                 }
@@ -509,7 +514,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
               className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary"
             >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email Partner
+              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email Prospect
             </Button>
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
@@ -595,7 +600,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               onClick={() => {
                 if (!r.matchedPartner) {
                   setEditingPartnerId(r.dbId || r.articleUrl);
-                  toast.info("Assign a partner first");
+                  toast.info("Assign a contact first");
                 } else {
                   handleSendToPartner(r);
                 }
@@ -603,7 +608,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
               className="text-xs gap-1.5 text-muted-foreground hover:text-primary"
             >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Email Partner
+              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Email Prospect
             </Button>
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
