@@ -1,7 +1,7 @@
-// Shared LLM abstraction — supports Gemini Direct (Google AI), Lovable AI Gateway, and Claude (Anthropic)
+// Shared LLM abstraction — supports Gemini Direct, Lovable AI Gateway, Claude (Anthropic), OpenAI
 // Toggle the active provider by passing `provider` option or setting LLM_PROVIDER env var.
 
-export type LLMProvider = "gemini_direct" | "lovable" | "claude";
+export type LLMProvider = "gemini_direct" | "lovable" | "claude" | "openai";
 
 interface LLMCallOptions {
   systemPrompt: string;
@@ -21,8 +21,8 @@ interface LLMResult {
 
 function getProvider(): LLMProvider {
   const env = Deno.env.get("LLM_PROVIDER");
-  if (env === "gemini_direct" || env === "lovable" || env === "claude") return env;
-  return "gemini_direct"; // default
+  if (env === "gemini_direct" || env === "lovable" || env === "claude" || env === "openai") return env;
+  return "openai"; // default
 }
 
 // ── Gemini Direct (Google AI Studio / Generative Language API) ──
@@ -64,10 +64,10 @@ async function callGeminiDirect(opts: LLMCallOptions): Promise<LLMResult> {
   const model = opts.model || "gemini-2.5-flash";
 
   const contents: any[] = [];
-  
+
   // System instruction is separate in Gemini API
   const systemInstruction = { parts: [{ text: opts.systemPrompt }] };
-  
+
   contents.push({ role: "user", parts: [{ text: opts.userMessage }] });
 
   const body: any = {
@@ -83,7 +83,6 @@ async function callGeminiDirect(opts: LLMCallOptions): Promise<LLMResult> {
       function_declarations: convertToolsToGeminiDirect(opts.tools),
     }];
     if (opts.toolChoice) {
-      // Force a specific function call
       body.tool_config = {
         function_calling_config: {
           mode: "ANY",
@@ -94,7 +93,7 @@ async function callGeminiDirect(opts: LLMCallOptions): Promise<LLMResult> {
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -110,11 +109,10 @@ async function callGeminiDirect(opts: LLMCallOptions): Promise<LLMResult> {
   }
 
   const data = await response.json();
-  
-  // Extract function call from Gemini response
+
   const candidate = data.candidates?.[0];
   const parts = candidate?.content?.parts || [];
-  
+
   const fnCallPart = parts.find((p: any) => p.functionCall);
   if (fnCallPart) {
     return {
@@ -125,9 +123,61 @@ async function callGeminiDirect(opts: LLMCallOptions): Promise<LLMResult> {
     };
   }
 
-  // Extract text
   const textPart = parts.find((p: any) => p.text);
   return { content: textPart?.text || "" };
+}
+
+// ── OpenAI ──
+
+async function callOpenAI(opts: LLMCallOptions): Promise<LLMResult> {
+  const apiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
+
+  const model = opts.model || "gpt-4o";
+
+  const body: any = {
+    model,
+    max_tokens: 16384,
+    messages: [
+      { role: "system", content: opts.systemPrompt },
+      { role: "user", content: opts.userMessage },
+    ],
+  };
+
+  if (opts.tools?.length) {
+    body.tools = opts.tools;
+    if (opts.toolChoice) body.tool_choice = opts.toolChoice;
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status === 429) throw new RateLimitError();
+  if (response.status === 402) throw new CreditsExhaustedError();
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("OpenAI error:", response.status, errText);
+    throw new Error(`OpenAI API call failed (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+  if (toolCall) {
+    return {
+      toolCall: {
+        name: toolCall.function.name,
+        arguments: toolCall.function.arguments,
+      },
+    };
+  }
+
+  return { content: data.choices?.[0]?.message?.content || "" };
 }
 
 // ── Claude (Anthropic) ──
@@ -151,7 +201,7 @@ async function callClaude(opts: LLMCallOptions): Promise<LLMResult> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured");
 
-  const model = opts.model || "claude-sonnet-4-20250514";
+  const model = opts.model || "claude-sonnet-4-6";
 
   const body: any = {
     model,
@@ -182,7 +232,7 @@ async function callClaude(opts: LLMCallOptions): Promise<LLMResult> {
   if (!response.ok) {
     const errText = await response.text();
     console.error("Claude error:", response.status, errText);
-    throw new Error("Claude API call failed");
+    throw new Error(`Claude API call failed (${response.status}): ${errText}`);
   }
 
   const data = await response.json();
@@ -264,17 +314,19 @@ export class CreditsExhaustedError extends Error {
 }
 
 export const LLM_PROVIDERS: { id: LLMProvider; label: string; model: string }[] = [
+  { id: "openai", label: "GPT-4o", model: "gpt-4o" },
   { id: "gemini_direct", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
   { id: "lovable", label: "Lovable AI", model: "google/gemini-3-flash-preview" },
-  { id: "claude", label: "Claude Sonnet 4", model: "claude-sonnet-4-20250514" },
+  { id: "claude", label: "Claude Sonnet 4", model: "claude-sonnet-4-6" },
 ];
 
 export async function callLLM(opts: LLMCallOptions): Promise<LLMResult> {
   const provider = opts.provider || getProvider();
   switch (provider) {
+    case "openai": return callOpenAI(opts);
     case "gemini_direct": return callGeminiDirect(opts);
     case "claude": return callClaude(opts);
     case "lovable": return callLovable(opts);
-    default: return callGeminiDirect(opts);
+    default: return callOpenAI(opts);
   }
 }

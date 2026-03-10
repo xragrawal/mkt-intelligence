@@ -49,13 +49,6 @@ interface EnrichedResult {
   };
 }
 
-interface PartnerOption {
-  id: string;
-  name: string;
-  email: string;
-  region: string;
-}
-
 interface BatchGroup {
   batchId: string;
   label: string;
@@ -101,21 +94,15 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [isLoadingExisting, setIsLoadingExisting] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "detail">("table");
   const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
-  const [allPartners, setAllPartners] = useState<PartnerOption[]>([]);
   const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
+  const [emailDraft, setEmailDraft] = useState<string>("");
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
   const [batchesInitialized, setBatchesInitialized] = useState(false);
   const { provider } = useLLMProvider();
 
   useEffect(() => {
     loadExistingPacks();
-    loadAllPartners();
   }, []);
-
-  const loadAllPartners = async () => {
-    const { data } = await supabase.from("flytbase_partners").select("id, name, email, region").order("name");
-    if (data) setAllPartners(data);
-  };
 
   const loadExistingPacks = async () => {
     setIsLoadingExisting(true);
@@ -279,24 +266,26 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     await handleStatusChange(result, "deleted");
   };
 
-  const handlePartnerChange = async (result: EnrichedResult, partner: PartnerOption | null) => {
-    const newPartner = partner ? { name: partner.name, email: partner.email } : null;
+  const handleEmailSet = async (result: EnrichedResult, email: string) => {
+    const trimmed = email.trim();
+    const newPartner = trimmed ? { name: trimmed, email: trimmed } : null;
     if (result.dbId) {
       const { error } = await supabase
         .from("opportunity_packs")
         .update({
-          matched_partner_name: newPartner?.name || null,
+          matched_partner_name: newPartner?.email || null,
           matched_partner_email: newPartner?.email || null,
         })
         .eq("id", result.dbId);
       if (error) {
-        toast.error("Failed to update partner");
+        toast.error("Failed to save email");
         return;
       }
     }
     setResults((prev) => prev.map((r) => (isSameResult(r, result) ? { ...r, matchedPartner: newPartner } : r)));
     setEditingPartnerId(null);
-    toast.success(newPartner ? `Partner set to ${newPartner.name}` : "Partner removed");
+    setEmailDraft("");
+    toast.success(newPartner ? `Email set to ${newPartner.email}` : "Email cleared");
   };
 
   const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
@@ -452,38 +441,43 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           {sc?.pocName || "—"}
         </td>
         <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
-        <td className="py-2 px-2 align-top" style={{ maxWidth: 140 }}>
+        <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
           {editingPartnerId === (r.dbId || r.articleUrl) ? (
-            <div className="space-y-1">
-              <select
-                className="w-full text-[11px] bg-background border border-border rounded px-1 py-0.5 text-foreground"
-                defaultValue={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
-                onChange={(e) => {
-                  const selected = allPartners.find(p => p.id === e.target.value);
-                  handlePartnerChange(r, selected || null);
+            <div className="flex items-center gap-1">
+              <input
+                type="email"
+                autoFocus
+                placeholder="email@company.com"
+                defaultValue={r.matchedPartner?.email || ""}
+                onChange={(e) => setEmailDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleEmailSet(r, emailDraft || (e.target as HTMLInputElement).value);
+                  if (e.key === "Escape") { setEditingPartnerId(null); setEmailDraft(""); }
                 }}
+                className="w-full text-[11px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground min-w-0"
+              />
+              <button
+                onClick={() => handleEmailSet(r, emailDraft)}
+                className="p-0.5 text-primary hover:text-primary/80 shrink-0"
+                title="Save"
               >
-                <option value="">— None —</option>
-                {allPartners.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.region})</option>
-                ))}
-              </select>
-              <button onClick={() => setEditingPartnerId(null)} className="text-[10px] text-muted-foreground hover:text-foreground">Cancel</button>
+                <Check className="w-3 h-3" />
+              </button>
+              <button onClick={() => { setEditingPartnerId(null); setEmailDraft(""); }} className="p-0.5 text-muted-foreground hover:text-foreground shrink-0" title="Cancel">
+                <XCircle className="w-3 h-3" />
+              </button>
             </div>
           ) : (
             <div className="flex items-start gap-1">
               {r.matchedPartner ? (
-                <div className="space-y-0.5 min-w-0">
-                  <div className="text-foreground font-medium text-[11px]">{r.matchedPartner.name}</div>
-                  <a href={`mailto:${r.matchedPartner.email}`} className="text-[10px] text-primary hover:underline">{r.matchedPartner.email}</a>
-                </div>
+                <a href={`mailto:${r.matchedPartner.email}`} className="text-[11px] text-primary hover:underline break-all">{r.matchedPartner.email}</a>
               ) : (
                 <span className="text-muted-foreground text-[11px]">—</span>
               )}
               <button
-                onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)}
+                onClick={() => { setEditingPartnerId(r.dbId || r.articleUrl); setEmailDraft(r.matchedPartner?.email || ""); }}
                 className="p-0.5 text-muted-foreground hover:text-primary shrink-0 mt-0.5"
-                title="Change partner"
+                title="Set email"
               >
                 <Edit2 className="w-3 h-3" />
               </button>
@@ -506,7 +500,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               onClick={() => {
                 if (!r.matchedPartner) {
                   setEditingPartnerId(r.dbId || r.articleUrl);
-                  toast.info("Assign a contact first, then click Email Prospect");
+                  toast.info("Enter an email first, then click Email");
                 } else {
                   handleSendToPartner(r);
                 }
@@ -514,7 +508,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
               className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary"
             >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email Prospect
+              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email
             </Button>
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
@@ -540,32 +534,33 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
         {/* BD context summary bar */}
         <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border rounded-t-xl bg-muted/30 text-xs">
           {sc?.partnerOrSI && <span className="text-foreground">🤝 Involved: {sc.partnerOrSI}</span>}
-          {r.matchedPartner ? (
+          {editingPartnerId === (r.dbId || r.articleUrl) ? (
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-muted-foreground">📧</span>
+              <input
+                type="email"
+                autoFocus
+                placeholder="email@company.com"
+                defaultValue={r.matchedPartner?.email || ""}
+                onChange={(e) => setEmailDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleEmailSet(r, emailDraft || (e.target as HTMLInputElement).value);
+                  if (e.key === "Escape") { setEditingPartnerId(null); setEmailDraft(""); }
+                }}
+                className="text-[11px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground w-48"
+              />
+              <button onClick={() => handleEmailSet(r, emailDraft)} className="text-primary hover:text-primary/80" title="Save"><Check className="w-3.5 h-3.5" /></button>
+              <button onClick={() => { setEditingPartnerId(null); setEmailDraft(""); }} className="text-muted-foreground hover:text-foreground" title="Cancel"><XCircle className="w-3.5 h-3.5" /></button>
+            </div>
+          ) : r.matchedPartner ? (
             <span className="text-primary font-medium inline-flex items-center gap-1">
-              🏢 FlytBase Partner: {r.matchedPartner.name}
-              <button onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)} className="text-muted-foreground hover:text-primary"><Edit2 className="w-3 h-3" /></button>
+              📧 <a href={`mailto:${r.matchedPartner.email}`} className="hover:underline">{r.matchedPartner.email}</a>
+              <button onClick={() => { setEditingPartnerId(r.dbId || r.articleUrl); setEmailDraft(r.matchedPartner?.email || ""); }} className="text-muted-foreground hover:text-primary"><Edit2 className="w-3 h-3" /></button>
             </span>
           ) : (
-            <button onClick={() => setEditingPartnerId(r.dbId || r.articleUrl)} className="text-muted-foreground hover:text-primary text-[11px] inline-flex items-center gap-1">
-              🏢 Assign Partner <Edit2 className="w-3 h-3" />
+            <button onClick={() => { setEditingPartnerId(r.dbId || r.articleUrl); setEmailDraft(""); }} className="text-muted-foreground hover:text-primary text-[11px] inline-flex items-center gap-1">
+              📧 Enter email <Edit2 className="w-3 h-3" />
             </button>
-          )}
-          {editingPartnerId === (r.dbId || r.articleUrl) && (
-            <select
-              key={`partner-select-${r.dbId || r.articleUrl}`}
-              className="text-[11px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground"
-              value={allPartners.find(p => p.name === r.matchedPartner?.name)?.id || ""}
-              onChange={(e) => {
-                const selected = allPartners.find(p => p.id === e.target.value);
-                handlePartnerChange(r, selected || null);
-              }}
-              autoFocus
-            >
-              <option value="">— None —</option>
-              {allPartners.map(p => (
-                <option key={p.id} value={p.id}>{p.name} ({p.region})</option>
-              ))}
-            </select>
           )}
           {(sc?.city || sc?.country) && <span className="text-foreground">📍 {[sc?.city, sc?.country].filter(Boolean).join(", ")}</span>}
           {sc?.unitsMentioned && <span className="text-foreground">📦 {sc.unitsMentioned} units</span>}
@@ -600,7 +595,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               onClick={() => {
                 if (!r.matchedPartner) {
                   setEditingPartnerId(r.dbId || r.articleUrl);
-                  toast.info("Assign a contact first");
+                  toast.info("Enter an email first");
                 } else {
                   handleSendToPartner(r);
                 }
@@ -608,7 +603,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
               className="text-xs gap-1.5 text-muted-foreground hover:text-primary"
             >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Email Prospect
+              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Email
             </Button>
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
@@ -641,7 +636,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">Involved Parties</th>
                 <th className="py-2 px-2 font-medium">PoC</th>
                 <th className="py-2 px-2 font-medium">Location</th>
-                <th className="py-2 px-2 font-medium">FlytBase Partner</th>
+                <th className="py-2 px-2 font-medium">Email</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
               </tr>
