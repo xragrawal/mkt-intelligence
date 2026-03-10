@@ -40,6 +40,7 @@ export interface ArticleScanResult {
   involvedParties: string[];
   dealValue: string | null;
   pocName: string | null;
+  emailsMentioned: string[];
   useCaseCategory: string | null;
   buyingIntentType: BuyingIntentType;
   leadClarityScore: number;

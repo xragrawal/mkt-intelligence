@@ -34,6 +34,7 @@ interface EnrichedResult {
     involvedParties?: string[];
     dealValue?: string | null;
     pocName?: string | null;
+    emailsMentioned?: string[];
     buyingIntentType?: string;
     confidence?: string;
     bdImpactScore?: number;
@@ -230,6 +231,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               involvedParties: sa.scan.involvedParties || [],
               dealValue: sa.scan.dealValue || null,
               pocName: sa.scan.pocName || null,
+              emailsMentioned: sa.scan.emailsMentioned || [],
               buyingIntentType: sa.scan.buyingIntentType,
               confidence: sa.scan.confidence,
               bdImpactScore: sa.scan.bdImpactScore,
@@ -437,8 +439,15 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             );
           })()}
         </td>
-        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 120 }}>
-          {sc?.pocName || "—"}
+        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 160 }}>
+          <div className="flex flex-col gap-0.5">
+            <span>{sc?.pocName || "—"}</span>
+            {sc?.emailsMentioned && sc.emailsMentioned.length > 0 && (
+              <span className="text-[10px] text-muted-foreground break-all line-clamp-2" title={sc.emailsMentioned.join(", ")}>
+                {sc.emailsMentioned.join(", ")}
+              </span>
+            )}
+          </div>
         </td>
         <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
         <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
@@ -564,6 +573,11 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           )}
           {(sc?.city || sc?.country) && <span className="text-foreground">📍 {[sc?.city, sc?.country].filter(Boolean).join(", ")}</span>}
           {sc?.unitsMentioned && <span className="text-foreground">📦 {sc.unitsMentioned} units</span>}
+          {sc?.emailsMentioned && sc.emailsMentioned.length > 0 && (
+            <span className="text-foreground break-all">
+              📧 {sc.emailsMentioned.join(", ")}
+            </span>
+          )}
           {sc?.buyingIntentType && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
               {SIGNAL_LABELS[sc.buyingIntentType as BuyingIntentType] || sc.buyingIntentType}

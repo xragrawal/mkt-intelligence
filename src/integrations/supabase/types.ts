@@ -304,6 +304,7 @@ export type Database = {
           lead_clarity_score: number | null
           partner_or_si: string | null
           poc_name: string | null
+          emails_mentioned: string[] | null
           source: string | null
           source_quality_score: number | null
           units_mentioned: number | null
@@ -329,6 +330,7 @@ export type Database = {
           lead_clarity_score?: number | null
           partner_or_si?: string | null
           poc_name?: string | null
+          emails_mentioned?: string[] | null
           source?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
@@ -354,6 +356,7 @@ export type Database = {
           lead_clarity_score?: number | null
           partner_or_si?: string | null
           poc_name?: string | null
+          emails_mentioned?: string[] | null
           source?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null

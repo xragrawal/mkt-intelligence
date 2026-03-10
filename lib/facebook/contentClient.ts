@@ -503,6 +503,9 @@ export async function fetchContentSearch(
     const mergedSeen = new Set<string>();
 
     for (const p of graphqlPosts) {
+      // Skip group posts
+      if (p.postUrl && p.postUrl.includes("/groups/")) continue;
+
       const key = p.postContent.slice(0, 120);
       if (!mergedSeen.has(key)) {
         mergedSeen.add(key);
@@ -520,6 +523,9 @@ export async function fetchContentSearch(
     }
 
     for (const p of [...initialPosts, ...scrollPosts]) {
+      // Skip group posts
+      if (p.postUrl && p.postUrl.includes("/groups/")) continue;
+
       const key = p.postContent.slice(0, 120);
       if (!mergedSeen.has(key)) {
         mergedSeen.add(key);
@@ -529,8 +535,43 @@ export async function fetchContentSearch(
 
     console.log(
       `[Facebook] Merged: ${finalPosts.length} posts total` +
-        ` (${graphqlPosts.length} GraphQL + ${initialPosts.length + scrollPosts.length} DOM)`
+        ` (${graphqlPosts.length} GraphQL + ${
+          initialPosts.length + scrollPosts.length
+        } DOM)`
     );
+
+    // Pretty-print post details for debugging / inspection
+    if (finalPosts.length > 0) {
+      console.log("\n[Facebook] ====== POST DETAILS ======\n");
+      finalPosts.forEach((post, index) => {
+        const snippetLimit = 320;
+        const contentSnippet =
+          post.postContent.length > snippetLimit
+            ? `${post.postContent.slice(0, snippetLimit)}…`
+            : post.postContent;
+
+        console.log(
+          [
+            `Post #${index + 1}`.padEnd(40, " "),
+            "────────────────────────────────────────",
+          ].join("\n")
+        );
+        console.log(`Author       : ${post.authorName || "Unknown"}`);
+        console.log(`Post URL     : ${post.postUrl || "(none found)"}`);
+        console.log(
+          `Published At : ${post.publishedAt ? post.publishedAt : "(unknown)"}`
+        );
+        console.log(`Reactions    : ${post.reactionsCount}`);
+        console.log(`Comments     : ${post.commentsCount}`);
+        console.log(`Scraped At   : ${post.scrapedAt}`);
+        console.log("Content      :");
+        console.log(contentSnippet);
+        console.log(""); // blank line between posts
+      });
+      console.log("[Facebook] ===== END POST DETAILS =====\n");
+    } else {
+      console.log("[Facebook] No posts extracted to display.");
+    }
 
     return {
       keyword,

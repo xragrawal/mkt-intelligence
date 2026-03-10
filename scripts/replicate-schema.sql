@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS public.scored_articles (
   involved_parties TEXT[] DEFAULT ARRAY[]::TEXT[],
   deal_value text,
   poc_name text,
+  emails_mentioned TEXT[] DEFAULT ARRAY[]::TEXT[],
   use_case_category text,
   buying_intent_type text,
   lead_clarity_score integer DEFAULT 0,

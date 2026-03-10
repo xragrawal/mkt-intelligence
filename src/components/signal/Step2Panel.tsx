@@ -579,6 +579,9 @@ export function Step2Panel({
                   {sa.scan.country && <span>📍 {[sa.scan.city, sa.scan.country].filter(Boolean).join(", ")}</span>}
                   {sa.scan.unitsMentioned && <span>📦 {sa.scan.unitsMentioned} units</span>}
                   {sa.scan.partnerOrSI && <span>🤝 {sa.scan.partnerOrSI}</span>}
+                  {sa.scan.emailsMentioned && sa.scan.emailsMentioned.length > 0 && (
+                    <span>📧 {sa.scan.emailsMentioned.join(", ")}</span>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
