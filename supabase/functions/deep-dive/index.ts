@@ -17,6 +17,9 @@ GLOBAL RULES:
 - NO HALLUCINATION — if a value is uncertain, prefix with "Assumed:"
 - Set values to null if not explicitly supported by the article
 - ALL output text MUST be in English. If the source article is in another language, translate all content to English.
+- Output MUST include two exhaustive lists derived from the article and context:
+  - People of Contact (POC): all people mentioned in the article/context
+  - Involved Parties: all companies/organizations mentioned in the article/context
 
 ---
 
@@ -106,9 +109,33 @@ FIELD-LEVEL RULES:
 - false if only FlytBase products/technology are referenced without the company name
 - Purely a flag — does not affect scoring
 
+[peopleOfContact]
+- Include ALL people mentioned (names) in the article/context (executives, spokespeople, procurement contacts, government officials, etc.)
+- Each entry must be an object with:
+  - name (required)
+  - titleOrRole (null if not stated)
+  - organization (null if not stated)
+  - email (null if not stated)
+  - phone (null if not stated)
+  - linkedinUrl (null if not stated)
+  - mentionContext (short quote-like description of why they matter / how they are referenced)
+- Do NOT invent contact details. If the person is mentioned but contact info is missing, keep those fields null.
+- If no people are mentioned, output an empty array []
+
+[involvedParties]
+- Include ALL companies/organizations mentioned (operators/buyers, vendors, OEMs, integrators, regulators, partners, contractors, agencies, event organizers)
+- Each entry must be an object with:
+  - name (required; full official name when possible)
+  - partyType (choose one: Buyer/Operator, Vendor/OEM, System Integrator, Government/Regulator, Partner, Customer, Investor/Funder, Media/Publisher, Other)
+  - countryOrRegion (null if not stated)
+  - relationshipToPrimaryCompany (short string, e.g. "buyer", "operator", "vendor", "partner", or null if unclear)
+  - mentionContext (short description of why they are involved)
+- Do NOT omit parties just because they are not the primary buyer/operator.
+- If no companies/organizations are mentioned, output an empty array []
+
 ---
 
-The output must be a structured Opportunity Intelligence Pack.`;
+The output must be a structured Opportunity Intelligence Pack (strictly following the provided JSON schema).`;
 
 const DEEP_DIVE_TOOL = {
   type: "function" as const,
@@ -118,13 +145,60 @@ const DEEP_DIVE_TOOL = {
     parameters: {
       type: "object",
       properties: {
+        peopleOfContact: {
+          type: "array",
+          description: "All people mentioned in the article/context (POCs)",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              titleOrRole: { type: ["string", "null"] },
+              organization: { type: ["string", "null"] },
+              email: { type: ["string", "null"] },
+              phone: { type: ["string", "null"] },
+              linkedinUrl: { type: ["string", "null"] },
+              mentionContext: { type: "string" },
+            },
+            required: ["name", "titleOrRole", "organization", "email", "phone", "linkedinUrl", "mentionContext"],
+            additionalProperties: false,
+          },
+        },
+        involvedParties: {
+          type: "array",
+          description: "All companies/organizations mentioned in the article/context (involved parties)",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              partyType: {
+                type: "string",
+                enum: [
+                  "Buyer/Operator",
+                  "Vendor/OEM",
+                  "System Integrator",
+                  "Government/Regulator",
+                  "Partner",
+                  "Customer",
+                  "Investor/Funder",
+                  "Media/Publisher",
+                  "Other",
+                ],
+              },
+              countryOrRegion: { type: ["string", "null"] },
+              relationshipToPrimaryCompany: { type: ["string", "null"] },
+              mentionContext: { type: "string" },
+            },
+            required: ["name", "partyType", "countryOrRegion", "relationshipToPrimaryCompany", "mentionContext"],
+            additionalProperties: false,
+          },
+        },
         companyProfile: {
           type: "object",
           properties: {
-            companyName: { type: "string" },
-            inferredIndustry: { type: "string" },
-            deploymentRegion: { type: "string" },
-            likelyBuyerType: { type: "string" },
+            companyName: { type: ["string", "null"] },
+            inferredIndustry: { type: ["string", "null"] },
+            deploymentRegion: { type: ["string", "null"] },
+            likelyBuyerType: { type: ["string", "null"] },
             maturitySignal: { type: "string", enum: ["EARLY", "SCALING", "ENTERPRISE_GRADE"] },
           },
           required: ["companyName", "inferredIndustry", "deploymentRegion", "likelyBuyerType", "maturitySignal"],
@@ -132,8 +206,8 @@ const DEEP_DIVE_TOOL = {
         deploymentSignal: {
           type: "object",
           properties: {
-            eventType: { type: "string" },
-            scale: { type: "string" },
+            eventType: { type: ["string", "null"] },
+            scale: { type: ["string", "null"] },
             urgencyLevel: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
             expansionLikelihood: { type: "string", enum: ["LOW", "MEDIUM", "HIGH"] },
           },
@@ -142,10 +216,10 @@ const DEEP_DIVE_TOOL = {
         bdOpportunityAssessment: {
           type: "object",
           properties: {
-            whyThisIsHot: { type: "string" },
-            strategicEntryPoint: { type: "string" },
-            partnershipAngle: { type: "string" },
-            riskFactors: { type: "string" },
+            whyThisIsHot: { type: ["string", "null"] },
+            strategicEntryPoint: { type: ["string", "null"] },
+            partnershipAngle: { type: ["string", "null"] },
+            riskFactors: { type: ["string", "null"] },
             opportunityScore: { type: "number" },
           },
           required: ["whyThisIsHot", "strategicEntryPoint", "partnershipAngle", "riskFactors", "opportunityScore"],
@@ -153,7 +227,15 @@ const DEEP_DIVE_TOOL = {
         crmReadyNotes: { type: "string" },
         flytbaseMentioned: { type: "boolean", description: "true if FlytBase is mentioned in the article title or context" },
       },
-      required: ["companyProfile", "deploymentSignal", "bdOpportunityAssessment", "crmReadyNotes", "flytbaseMentioned"],
+      required: [
+        "peopleOfContact",
+        "involvedParties",
+        "companyProfile",
+        "deploymentSignal",
+        "bdOpportunityAssessment",
+        "crmReadyNotes",
+        "flytbaseMentioned",
+      ],
       additionalProperties: false,
     },
   },
@@ -173,8 +255,8 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = process.env.get("SUPABASE_URL")!;
+    const supabaseKey = process.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const contextParts = [
