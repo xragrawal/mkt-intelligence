@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS, CONTINENT_COUNTRY_MAP, CONTINENTS, resolveRegionsToCountries } from "@/lib/types";
+import { DEFAULT_KEYWORDS, DEFAULT_FILTER_DAYS, FILTER_DAY_OPTIONS, MAX_ARTICLES_STORED, NEWS_REGIONS, CONTINENT_COUNTRY_MAP, CONTINENTS, resolveRegionsToCountries, SOURCE_LABELS, SOURCE_COLORS } from "@/lib/types";
 import type { CollectionRunSummary, CollectedArticle, FetchedArticleSummary, PipelineBreakdown, NewsRegion } from "@/lib/types";
 import { useLLMProvider, LLM_OPTIONS, type LLMProvider } from "@/lib/llm-context";
 import { toast } from "sonner";
@@ -738,7 +738,7 @@ function ArticleTableDialog({
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="py-2 pr-2 font-medium w-8">#</th>
                 <th className="py-2 pr-2 font-medium">Title</th>
-                
+                <th className="py-2 pr-2 font-medium w-24">Source</th>
                 <th className="py-2 pr-2 font-medium w-28">Publisher</th>
                 <th className="py-2 pr-2 font-medium w-20">Keyword</th>
                 <th className="py-2 font-medium w-20">Published</th>
@@ -758,6 +758,13 @@ function ArticleTableDialog({
                       <span className="line-clamp-2">{a.title}</span>
                       <ExternalLink className="w-3 h-3 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
                     </a>
+                  </td>
+                  <td className="py-2 pr-2">
+                    {a.source ? (
+                      <Badge variant="outline" className={`text-[9px] px-1.5 py-0 border ${SOURCE_COLORS[a.source as keyof typeof SOURCE_COLORS] || ""}`}>
+                        {SOURCE_LABELS[a.source as keyof typeof SOURCE_LABELS] || a.source}
+                      </Badge>
+                    ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="py-2 pr-2 text-muted-foreground truncate max-w-[120px]">{a.publishing_agency || "—"}</td>
                   <td className="py-2 pr-2">

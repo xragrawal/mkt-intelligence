@@ -21,6 +21,7 @@ export interface CollectedArticle {
   published_at: string | null;
   created_at: string;
   batch_id: string;
+  original_batch_id?: string | null;
   source: ArticleSource;
 }
 
@@ -86,6 +87,7 @@ export interface OpportunityPack {
 export interface CollectionRunSummary {
   id: string;
   keywords: string[];
+  regions?: string[];
   articles_collected: number;
   articles_stored: number;
   after_dedup?: number;
@@ -172,7 +174,7 @@ export const FILTER_DAY_OPTIONS = [7, 14, 30, 60, 90] as const;
 
 export const MAX_ARTICLES_STORED = 50;
 
-export const MIN_BD_IMPACT_SCORE = 60;
+export const MIN_BD_IMPACT_SCORE = 50;
 
 export const CONTINENT_COUNTRY_MAP: Record<string, string[]> = {
   "North America": ["US", "Canada", "Mexico"],

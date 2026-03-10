@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           id: string
           keyword: string
+          original_batch_id: string | null
           published_at: string | null
           publishing_agency: string | null
           snippet: string | null
@@ -32,6 +33,7 @@ export type Database = {
           created_at?: string
           id: string
           keyword: string
+          original_batch_id?: string | null
           published_at?: string | null
           publishing_agency?: string | null
           snippet?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           created_at?: string
           id?: string
           keyword?: string
+          original_batch_id?: string | null
           published_at?: string | null
           publishing_agency?: string | null
           snippet?: string | null
@@ -61,6 +64,7 @@ export type Database = {
           id: string
           keywords: string[]
           last_published_at: string | null
+          regions: string[]
           started_at: string
           status: string
         }
@@ -71,6 +75,7 @@ export type Database = {
           id: string
           keywords: string[]
           last_published_at?: string | null
+          regions?: string[]
           started_at?: string
           status?: string
         }
@@ -81,6 +86,7 @@ export type Database = {
           id?: string
           keywords?: string[]
           last_published_at?: string | null
+          regions?: string[]
           started_at?: string
           status?: string
         }
@@ -166,10 +172,12 @@ export type Database = {
       }
       opportunity_packs: {
         Row: {
+          added_to_queue_at: string | null
           article_source: string | null
           article_title: string
           article_url: string
           batch_id: string | null
+          batch_region: string | null
           collection_ran_at: string | null
           company_name: string | null
           created_at: string
@@ -181,6 +189,7 @@ export type Database = {
           flytbase_mentioned: boolean | null
           id: string
           inferred_industry: string | null
+          is_re_associated: boolean | null
           keywords: string[] | null
           likely_buyer_type: string | null
           matched_partner_email: string | null
@@ -190,6 +199,7 @@ export type Database = {
           opportunity_score: number | null
           partnership_angle: string | null
           raw_json: Json | null
+          re_associated_from_batch_id: string | null
           risk_factors: string | null
           scale_description: string | null
           status: string
@@ -199,10 +209,12 @@ export type Database = {
           why_this_is_hot: string | null
         }
         Insert: {
+          added_to_queue_at?: string | null
           article_source?: string | null
           article_title: string
           article_url: string
           batch_id?: string | null
+          batch_region?: string | null
           collection_ran_at?: string | null
           company_name?: string | null
           created_at?: string
@@ -214,6 +226,7 @@ export type Database = {
           flytbase_mentioned?: boolean | null
           id?: string
           inferred_industry?: string | null
+          is_re_associated?: boolean | null
           keywords?: string[] | null
           likely_buyer_type?: string | null
           matched_partner_email?: string | null
@@ -223,6 +236,7 @@ export type Database = {
           opportunity_score?: number | null
           partnership_angle?: string | null
           raw_json?: Json | null
+          re_associated_from_batch_id?: string | null
           risk_factors?: string | null
           scale_description?: string | null
           status?: string
@@ -232,10 +246,12 @@ export type Database = {
           why_this_is_hot?: string | null
         }
         Update: {
+          added_to_queue_at?: string | null
           article_source?: string | null
           article_title?: string
           article_url?: string
           batch_id?: string | null
+          batch_region?: string | null
           collection_ran_at?: string | null
           company_name?: string | null
           created_at?: string
@@ -247,6 +263,7 @@ export type Database = {
           flytbase_mentioned?: boolean | null
           id?: string
           inferred_industry?: string | null
+          is_re_associated?: boolean | null
           keywords?: string[] | null
           likely_buyer_type?: string | null
           matched_partner_email?: string | null
@@ -256,6 +273,7 @@ export type Database = {
           opportunity_score?: number | null
           partnership_angle?: string | null
           raw_json?: Json | null
+          re_associated_from_batch_id?: string | null
           risk_factors?: string | null
           scale_description?: string | null
           status?: string
@@ -286,6 +304,7 @@ export type Database = {
           lead_clarity_score: number | null
           partner_or_si: string | null
           poc_name: string | null
+          source: string | null
           source_quality_score: number | null
           units_mentioned: number | null
           use_case_category: string | null
@@ -310,6 +329,7 @@ export type Database = {
           lead_clarity_score?: number | null
           partner_or_si?: string | null
           poc_name?: string | null
+          source?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
           use_case_category?: string | null
@@ -334,6 +354,7 @@ export type Database = {
           lead_clarity_score?: number | null
           partner_or_si?: string | null
           poc_name?: string | null
+          source?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
           use_case_category?: string | null

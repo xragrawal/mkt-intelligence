@@ -1,7 +1,7 @@
 import { ExternalLink, CheckSquare, Square } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ScoredArticle, BuyingIntentType } from "@/lib/types";
-import { SIGNAL_LABELS } from "@/lib/types";
+import { SIGNAL_LABELS, SOURCE_LABELS, SOURCE_COLORS } from "@/lib/types";
 
 
 interface ArticleCardProps {
@@ -59,7 +59,13 @@ export function ArticleCard({ scoredArticle, selected, onToggle }: ArticleCardPr
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            
+
+            {article.source && (
+              <Badge variant="outline" className={`border ${SOURCE_COLORS[article.source]} text-xs px-2 py-0.5`}>
+                {SOURCE_LABELS[article.source]}
+              </Badge>
+            )}
+
             <Badge variant="outline" className={`border ${intentBgClass[scan.buyingIntentType]} text-xs px-2 py-0.5`}>
               {SIGNAL_LABELS[scan.buyingIntentType]}
             </Badge>

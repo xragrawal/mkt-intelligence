@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArticleCard } from "@/components/signal/ArticleCard";
 
 import type { CollectionRunSummary, ScoredArticle, BuyingIntentType } from "@/lib/types";
-import { SIGNAL_LABELS, MIN_BD_IMPACT_SCORE, resolveRegionsToCountries, CONTINENT_COUNTRY_MAP } from "@/lib/types";
+import { SIGNAL_LABELS, SOURCE_LABELS, SOURCE_COLORS, MIN_BD_IMPACT_SCORE, resolveRegionsToCountries, CONTINENT_COUNTRY_MAP } from "@/lib/types";
 import { toast } from "sonner";
 
 interface Step2PanelProps {
@@ -33,6 +33,7 @@ interface ScoringStats {
 
 interface DroppedArticle {
   title: string;
+  url?: string;
   reason: string;
   score?: number;
 }
@@ -147,7 +148,7 @@ export function Step2Panel({
               results.push(parsed.data);
               onArticlesScored([...results]);
             } else if (parsed.type === "dropped") {
-              dropped.push({ title: parsed.title, reason: parsed.reason, score: parsed.score });
+              dropped.push({ title: parsed.title, url: parsed.url, reason: parsed.reason, score: parsed.score });
               setDroppedArticles([...dropped]);
             } else if (parsed.type === "complete") {
               setStats({
@@ -361,7 +362,13 @@ export function Step2Panel({
                 <div key={i} className="flex items-start gap-2 text-xs">
                   <span className="text-destructive/60 shrink-0 mt-0.5">✕</span>
                   <div className="min-w-0">
-                    <p className="text-foreground/70 line-clamp-1">{d.title}</p>
+                    {d.url ? (
+                      <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-foreground/70 hover:text-primary hover:underline line-clamp-1 inline-flex items-center gap-0.5">
+                        {d.title} <ExternalLink className="w-3 h-3 shrink-0" />
+                      </a>
+                    ) : (
+                      <p className="text-foreground/70 line-clamp-1">{d.title}</p>
+                    )}
                     <p className="text-muted-foreground/70">
                       {d.reason}
                       {d.score !== undefined && <span className="ml-1 font-mono">(score: {d.score})</span>}
@@ -490,7 +497,12 @@ export function Step2Panel({
                     <td className="py-2.5 pr-2 text-muted-foreground tabular-nums">{i + 1}</td>
                     <td className="py-2.5 pr-2">
                       <div className="line-clamp-1 text-foreground">{sa.article.title}</div>
-                      <div className="flex items-center gap-2 text-muted-foreground mt-0.5">
+                      <div className="flex items-center flex-wrap gap-2 text-muted-foreground mt-0.5">
+                        {sa.article.source && (
+                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 border shrink-0 ${SOURCE_COLORS[sa.article.source as keyof typeof SOURCE_COLORS] || ""}`}>
+                            {SOURCE_LABELS[sa.article.source as keyof typeof SOURCE_LABELS] || sa.article.source}
+                          </Badge>
+                        )}
                         <span>{sa.article.publishing_agency || "—"}</span>
                         {sa.article.published_at && (
                           <span>{new Date(sa.article.published_at).toLocaleDateString()}</span>
@@ -499,7 +511,7 @@ export function Step2Panel({
                           href={sa.article.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="opacity-0 group-hover:opacity-100 text-primary hover:underline inline-flex items-center gap-0.5"
+                          className="text-primary hover:underline inline-flex items-center gap-0.5"
                           onClick={(e) => e.stopPropagation()}
                         >
                           Open <ExternalLink className="w-3 h-3" />

@@ -287,6 +287,7 @@ serve(async (req) => {
     await supabase.from("collection_runs").insert({
       id: batchId,
       keywords,
+      regions: rawRegions,
       status: "running",
     });
 
@@ -371,6 +372,24 @@ serve(async (req) => {
       // Re-associate existing articles with the current batch so scoring can find them
       if (existingToReassociate.length > 0) {
         const reIds = existingToReassociate.map(a => a.id);
+
+        // Preserve original batch_id before overwriting (only if not already set)
+        const { data: existingRows } = await supabase
+          .from("collected_articles")
+          .select("id, batch_id")
+          .in("id", reIds)
+          .is("original_batch_id", null);
+
+        if (existingRows && existingRows.length > 0) {
+          for (const row of existingRows) {
+            await supabase
+              .from("collected_articles")
+              .update({ original_batch_id: row.batch_id })
+              .eq("id", row.id);
+          }
+        }
+
+        // Then re-associate to current batch
         const { error: updateError } = await supabase
           .from("collected_articles")
           .update({ batch_id: batchId })
@@ -404,6 +423,7 @@ serve(async (req) => {
         run: {
           id: batchId,
           keywords,
+          regions: rawRegions,
           articles_collected: totalCollected,
           articles_stored: actualStored,
           after_dedup: afterDedup,

@@ -5,6 +5,7 @@ import { TrendingUp, Globe, Trash2, ExternalLink, ChevronDown, ChevronUp, BarCha
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { SOURCE_LABELS, SOURCE_COLORS } from "@/lib/types";
 
 interface MarketTrend {
   id: string;
@@ -13,6 +14,7 @@ interface MarketTrend {
   batch_id: string;
   article_title: string;
   article_url: string;
+  article_source: string | null;
   company: string | null;
   country: string | null;
   bd_impact_score: number | null;
@@ -197,6 +199,7 @@ export default function Trends() {
                       <th className="py-2 px-4 font-medium">Article</th>
                       <th className="py-2 px-2 font-medium w-24">Company</th>
                       <th className="py-2 px-2 font-medium w-20">Country</th>
+                      <th className="py-2 px-2 font-medium w-20">Source</th>
                       <th className="py-2 px-2 font-medium w-20">Signal</th>
                       <th className="py-2 px-2 font-medium w-14 text-center">Score</th>
                       <th className="py-2 px-2 font-medium w-10"></th>
@@ -221,6 +224,13 @@ export default function Trends() {
                         </td>
                         <td className="py-2.5 px-2 text-foreground break-words">{t.company || "—"}</td>
                         <td className="py-2.5 px-2 text-foreground">{t.country || "—"}</td>
+                        <td className="py-2.5 px-2">
+                          {t.article_source && (
+                            <Badge variant="outline" className={`text-[10px] px-1 py-0 whitespace-normal leading-tight border ${SOURCE_COLORS[t.article_source as keyof typeof SOURCE_COLORS] || ""}`}>
+                              {SOURCE_LABELS[t.article_source as keyof typeof SOURCE_LABELS] || t.article_source}
+                            </Badge>
+                          ) || "—"}
+                        </td>
                         <td className="py-2.5 px-2">
                           <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">
                             {t.buying_intent_type || "—"}

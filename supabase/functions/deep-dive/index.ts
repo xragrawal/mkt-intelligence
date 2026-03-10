@@ -20,7 +20,7 @@ GLOBAL RULES:
 - Output MUST include two exhaustive lists derived from the article and context:
   - People of Contact (POC): all people mentioned in the article/context
   - Involved Parties: all companies/organizations mentioned in the article/context
-
+- Use English as default language throughout
 ---
 
 FIELD-LEVEL RULES:
@@ -28,7 +28,7 @@ FIELD-LEVEL RULES:
 [companyName]
 - Extract the primary organization DEPLOYING or PROCURING drones — not Flytbase or DJI
 - Prefer full legal/official name over abbreviations
-- If multiple companies mentioned, pick the operator/buyer
+- If multiple companies mentioned, pick relevant operator/buyer ones
 - null if no specific company is identifiable
 
 [inferredIndustry]
@@ -72,6 +72,7 @@ FIELD-LEVEL RULES:
 - LOW: One-off deployment, no expansion language, unclear funding
 
 [whyThisIsHot]
+- Start by giving reference to the article / post title
 - Max 2-3 sentences; must cite specific signals from the article
 - Focus on why FlytBase specifically should act (dock hardware, autonomy, BVLOS relevance)
 - No generic statements like "drones are growing"
@@ -84,6 +85,7 @@ FIELD-LEVEL RULES:
 [partnershipAngle]
 - Identify if a system integrator, OEM, or telecom is already involved
 - Suggest direct approach vs. via partner
+- Use founder tone with curious approach
 - null if no partnership angle is evident
 
 [riskFactors]
@@ -92,10 +94,10 @@ FIELD-LEVEL RULES:
 
 [opportunityScore]
 - Integer 0-100
-- 90-100: Active tender/contract, large scale, high urgency, clear budget
-- 70-89: Pilot with expansion signals, government program, mid-to-large scale
-- 50-69: Single deployment, some expansion language, private sector
-- 30-49: Early-stage pilot, limited scale, speculative signals
+- 90-100: Active tender/contract, large scale, high urgency, clear budget, multiple parties collaborating with their names mentioned
+- 70-89: Pilot with expansion signals, government funded program, mid-to-large scale
+- 50-69: Single deployment, some expansion language, private sector, Early-stage pilot
+- 30-49: speculative signals, just a news, regulatory signal
 - 0-29: Generic interest, no procurement signal
 - Deduct 10-20 points if FlytBase is already mentioned (existing relationship)
 
@@ -110,7 +112,7 @@ FIELD-LEVEL RULES:
 - Purely a flag — does not affect scoring
 
 [peopleOfContact]
-- Include ALL people mentioned (names) in the article/context (executives, spokespeople, procurement contacts, government officials, etc.)
+- Include ALL relevant people mentioned (names) in the article/context (executives, spokespeople, procurement contacts, government officials, etc.)
 - Each entry must be an object with:
   - name (required)
   - titleOrRole (null if not stated)
@@ -123,7 +125,7 @@ FIELD-LEVEL RULES:
 - If no people are mentioned, output an empty array []
 
 [involvedParties]
-- Include ALL companies/organizations mentioned (operators/buyers, vendors, OEMs, integrators, regulators, partners, contractors, agencies, event organizers)
+- Include ALL relevant companies/organizations mentioned (operators/buyers, vendors, OEMs, integrators, regulators, partners, contractors, agencies, event organizers)
 - Each entry must be an object with:
   - name (required; full official name when possible)
   - partyType (choose one: Buyer/Operator, Vendor/OEM, System Integrator, Government/Regulator, Partner, Customer, Investor/Funder, Media/Publisher, Other)
@@ -131,7 +133,7 @@ FIELD-LEVEL RULES:
   - relationshipToPrimaryCompany (short string, e.g. "buyer", "operator", "vendor", "partner", or null if unclear)
   - mentionContext (short description of why they are involved)
 - Do NOT omit parties just because they are not the primary buyer/operator.
-- If no companies/organizations are mentioned, output an empty array []
+- If no companies/organizations are mentioned, DO NOT invent, output an empty array []
 
 ---
 
@@ -340,7 +342,11 @@ serve(async (req) => {
       if (batchContext.keywords) insertData.keywords = batchContext.keywords;
       if (batchContext.filterDays) insertData.filter_days = batchContext.filterDays;
       if (batchContext.collectionRanAt) insertData.collection_ran_at = batchContext.collectionRanAt;
+      if (batchContext.regions) insertData.batch_region = batchContext.regions.join(", ");
+      insertData.is_re_associated = batchContext.isReAssociated || false;
+      insertData.re_associated_from_batch_id = batchContext.reAssociatedFromBatchId || null;
     }
+    insertData.added_to_queue_at = new Date().toISOString();
 
     const { data: dbRow, error: dbError } = await supabase
       .from("opportunity_packs")

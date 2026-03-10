@@ -175,8 +175,8 @@ serve(async (req) => {
       .select("*")
       .in("article_id", articleIds);
 
-    const cachedMap = new Map((cached || []).map((c) => [c.article_id, c]));
-    const articleMap = new Map(articles.map((a) => [a.id, a]));
+    const cachedMap = new Map<string, any>((cached || []).map((c: any) => [c.article_id, c]));
+    const articleMap = new Map<string, any>(articles.map((a: any) => [a.id, a]));
 
     // SSE stream
     const encoder = new TextEncoder();
@@ -195,11 +195,11 @@ serve(async (req) => {
           if (!article) continue;
           const bdScore = cachedScore.bd_impact_score || 0;
           if (bdScore < scoreThreshold) {
-            send({ type: "dropped", title: article.title, reason: cachedScore.drop_reason || `Score ${bdScore} below threshold ${scoreThreshold}`, score: bdScore });
+            send({ type: "dropped", title: article.title, url: article.url, reason: cachedScore.drop_reason || `Score ${bdScore} below threshold ${scoreThreshold}`, score: bdScore });
             continue;
           }
           if (cachedScore.drop_reason) {
-            send({ type: "dropped", title: article.title, reason: cachedScore.drop_reason, score: bdScore });
+            send({ type: "dropped", title: article.title, url: article.url, reason: cachedScore.drop_reason, score: bdScore });
             continue;
           }
           const scan = {
@@ -245,8 +245,9 @@ serve(async (req) => {
               bd_impact_score: 0,
               why_it_matters: "Pre-filtered: " + dropReason,
               confidence: "HIGH",
+              source: a.source || "unknown",
             }, { onConflict: "article_id" });
-            send({ type: "dropped", title: a.title, reason: `Pre-filter: ${dropReason}` });
+            send({ type: "dropped", title: a.title, url: a.url, reason: `Pre-filter: ${dropReason}` });
           } else {
             toScore.push(a);
           }
@@ -321,13 +322,14 @@ serve(async (req) => {
                   bd_impact_score: scan.bdImpactScore,
                   why_it_matters: scan.whyItMatters,
                   confidence: scan.confidence,
+                  source: article.source || "unknown",
                 }, { onConflict: "article_id" });
 
                 if (isRelevant) {
                   results.push({ article, scan: { ...scan, dropReason: null } });
                   send({ type: "result", data: { article, scan: { ...scan, dropReason: null } } });
                 } else {
-                  send({ type: "dropped", title: article.title, reason: scan.dropReason || "Below threshold", score: scan.bdImpactScore });
+                  send({ type: "dropped", title: article.title, url: article.url, reason: scan.dropReason || "Below threshold", score: scan.bdImpactScore });
                 }
               }
             }

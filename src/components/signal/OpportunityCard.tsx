@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Copy, CheckCircle2, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { OpportunityPack } from "@/lib/types";
+import { SOURCE_LABELS, SOURCE_COLORS } from "@/lib/types";
 import { toast } from "sonner";
 
 interface OpportunityCardProps {
   articleTitle: string;
   articleUrl: string;
+  articleSource?: string | null;
   pack: OpportunityPack;
 }
 
@@ -22,7 +25,7 @@ const maturityBadge = {
   ENTERPRISE_GRADE: "bg-signal-contract/15 text-signal-contract",
 };
 
-export function OpportunityCard({ articleTitle, articleUrl, pack }: OpportunityCardProps) {
+export function OpportunityCard({ articleTitle, articleUrl, articleSource, pack }: OpportunityCardProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     profile: true,
     signal: true,
@@ -48,14 +51,21 @@ export function OpportunityCard({ articleTitle, articleUrl, pack }: OpportunityC
           <h3 className="text-sm font-display font-semibold text-foreground truncate">
             {articleTitle}
           </h3>
-          <a
-            href={articleUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1"
-          >
-            Source <ExternalLink className="w-3 h-3" />
-          </a>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {articleSource && (
+              <Badge variant="outline" className={`text-xs px-2 py-0.5 border ${SOURCE_COLORS[articleSource as keyof typeof SOURCE_COLORS] || ""}`}>
+                {SOURCE_LABELS[articleSource as keyof typeof SOURCE_LABELS] || articleSource}
+              </Badge>
+            )}
+            <a
+              href={articleUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
+              Read article <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </div>
         <div className="relative w-14 h-14 shrink-0">
           <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
