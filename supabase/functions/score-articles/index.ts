@@ -558,7 +558,6 @@ serve(async (req) => {
                     });
                   }
                 }
-              }
             }
           } catch (e) {
             if (e instanceof CreditsExhaustedError) {
@@ -663,7 +662,7 @@ serve(async (req) => {
                     message:
                       "No structured output from LinkedIn LLM call (could not parse JSON). Try again or switch provider.",
                   });
-                  return;
+                  // parsed remains undefined — fall through to complete
                 }
               } else {
                 send({
@@ -671,13 +670,14 @@ serve(async (req) => {
                   message:
                     "No structured output from LinkedIn LLM call (empty response). Try again.",
                 });
-                return;
+                // parsed remains undefined — fall through to complete
               }
 
-              const scores = Array.isArray(parsed)
-                ? parsed
-                : (parsed.scores || []);
-              if (!Array.isArray(scores) || scores.length === 0) {
+              if (parsed) {
+                const scores = Array.isArray(parsed)
+                  ? parsed
+                  : (parsed.scores || []);
+                if (!Array.isArray(scores) || scores.length === 0) {
                 console.error(
                   "LinkedIn LLM returned unexpected structure:",
                   JSON.stringify(parsed).slice(0, 500),
@@ -758,7 +758,7 @@ serve(async (req) => {
                     }
                   }
                 }
-              }
+              } // end if (parsed)
             } catch (e) {
               if (e instanceof CreditsExhaustedError) {
                 send({ type: "error", message: e.message });

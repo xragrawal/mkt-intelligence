@@ -191,10 +191,13 @@ export type Database = {
           inferred_industry: string | null
           is_re_associated: boolean | null
           keywords: string[] | null
+          last_analyzed_at: string | null
           likely_buyer_type: string | null
           matched_partner_email: string | null
           matched_partner_name: string | null
           maturity_signal: string | null
+          normalized_article_title: string | null
+          normalized_article_url: string | null
           notes: string | null
           opportunity_score: number | null
           partnership_angle: string | null
@@ -203,6 +206,7 @@ export type Database = {
           risk_factors: string | null
           scale_description: string | null
           status: string
+          status_history: Json | null
           status_updated_at: string | null
           strategic_entry_point: string | null
           urgency_level: string | null
@@ -228,10 +232,13 @@ export type Database = {
           inferred_industry?: string | null
           is_re_associated?: boolean | null
           keywords?: string[] | null
+          last_analyzed_at?: string | null
           likely_buyer_type?: string | null
           matched_partner_email?: string | null
           matched_partner_name?: string | null
           maturity_signal?: string | null
+          normalized_article_title?: string | null
+          normalized_article_url?: string | null
           notes?: string | null
           opportunity_score?: number | null
           partnership_angle?: string | null
@@ -240,6 +247,7 @@ export type Database = {
           risk_factors?: string | null
           scale_description?: string | null
           status?: string
+          status_history?: Json | null
           status_updated_at?: string | null
           strategic_entry_point?: string | null
           urgency_level?: string | null
@@ -265,10 +273,13 @@ export type Database = {
           inferred_industry?: string | null
           is_re_associated?: boolean | null
           keywords?: string[] | null
+          last_analyzed_at?: string | null
           likely_buyer_type?: string | null
           matched_partner_email?: string | null
           matched_partner_name?: string | null
           maturity_signal?: string | null
+          normalized_article_title?: string | null
+          normalized_article_url?: string | null
           notes?: string | null
           opportunity_score?: number | null
           partnership_angle?: string | null
@@ -277,6 +288,7 @@ export type Database = {
           risk_factors?: string | null
           scale_description?: string | null
           status?: string
+          status_history?: Json | null
           status_updated_at?: string | null
           strategic_entry_point?: string | null
           urgency_level?: string | null

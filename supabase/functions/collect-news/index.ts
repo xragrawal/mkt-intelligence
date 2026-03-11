@@ -371,32 +371,65 @@ serve(async (req) => {
 
       // Re-associate existing articles with the current batch so scoring can find them
       if (existingToReassociate.length > 0) {
-        const reIds = existingToReassociate.map(a => a.id);
+        // Gate 1: Skip re-association for articles already in opportunity_packs (any status).
+        // Once an article has reached Step 3 it should not re-surface in Step 2.
+        // Exception: status = 'deleted' AND deleted > 60 days ago → allow fresh start.
+        const candidateUrls = existingToReassociate.map(a => a.url);
+        const { data: actionedPacks } = await supabase
+          .from("opportunity_packs")
+          .select("article_url, status, status_updated_at")
+          .in("article_url", candidateUrls);
 
-        // Preserve original batch_id before overwriting (only if not already set)
-        const { data: existingRows } = await supabase
-          .from("collected_articles")
-          .select("id, batch_id")
-          .in("id", reIds)
-          .is("original_batch_id", null);
-
-        if (existingRows && existingRows.length > 0) {
-          for (const row of existingRows) {
-            await supabase
-              .from("collected_articles")
-              .update({ original_batch_id: row.batch_id })
-              .eq("id", row.id);
+        const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+        const blockedUrls = new Set<string>();
+        for (const pack of actionedPacks || []) {
+          if (pack.status === "deleted") {
+            const updatedAt = pack.status_updated_at ? new Date(pack.status_updated_at) : null;
+            // Block re-association only if deleted within the last 60 days
+            if (!updatedAt || updatedAt > sixtyDaysAgo) {
+              blockedUrls.add(pack.article_url);
+            }
+            // If deleted > 60 days ago: allow re-association (fresh start)
+          } else {
+            // All other statuses (open, emailed, archived, etc.) → permanently block
+            blockedUrls.add(pack.article_url);
           }
         }
 
-        // Then re-associate to current batch
-        const { error: updateError } = await supabase
-          .from("collected_articles")
-          .update({ batch_id: batchId })
-          .in("id", reIds);
+        const filteredForReassociation = existingToReassociate.filter(a => !blockedUrls.has(a.url));
+        const gatedCount = existingToReassociate.length - filteredForReassociation.length;
+        if (gatedCount > 0) {
+          console.log(`Gate 1: Skipped re-association for ${gatedCount} article(s) already in opportunity_packs`);
+        }
 
-        if (updateError) {
-          console.error("Re-associate error:", updateError);
+        if (filteredForReassociation.length > 0) {
+          const reIds = filteredForReassociation.map(a => a.id);
+
+          // Preserve original batch_id before overwriting (only if not already set)
+          const { data: existingRows } = await supabase
+            .from("collected_articles")
+            .select("id, batch_id")
+            .in("id", reIds)
+            .is("original_batch_id", null);
+
+          if (existingRows && existingRows.length > 0) {
+            for (const row of existingRows) {
+              await supabase
+                .from("collected_articles")
+                .update({ original_batch_id: row.batch_id })
+                .eq("id", row.id);
+            }
+          }
+
+          // Then re-associate to current batch
+          const { error: updateError } = await supabase
+            .from("collected_articles")
+            .update({ batch_id: batchId })
+            .in("id", reIds);
+
+          if (updateError) {
+            console.error("Re-associate error:", updateError);
+          }
         }
       }
     }

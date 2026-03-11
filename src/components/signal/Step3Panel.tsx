@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, ChevronRight, Mail, Edit2, Check, AlertTriangle } from "lucide-react";
+import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, ChevronRight, Mail, Edit2, Check, AlertTriangle, RefreshCw, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
@@ -22,6 +22,7 @@ interface EnrichedResult {
   dbId?: string;
   status: LeadStatus;
   createdAt?: string;
+  lastAnalyzedAt?: string | null;
   articleSource?: string | null;
   matchedPartner?: { name: string; email: string } | null;
   flytbaseMentioned?: boolean;
@@ -122,6 +123,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           dbId: row.id,
           status: (row.status as LeadStatus) || "open",
           createdAt: row.created_at,
+          lastAnalyzedAt: row.last_analyzed_at || row.created_at,
           matchedPartner: row.matched_partner_name ? { name: row.matched_partner_name, email: row.matched_partner_email } : null,
           flytbaseMentioned: row.flytbase_mentioned || false,
           batchRef: {
@@ -205,6 +207,20 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           continue;
         }
 
+        // Gate 3 responses
+        if (data?.gateStatus === "blocked") {
+          toast.info(`"${sa.article.title}" was recently deleted — skipping`);
+          continue;
+        }
+        if (data?.gateStatus === "archived") {
+          toast.info(`"${sa.article.title}" is archived. Restore it from your queue to re-analyze.`);
+          continue;
+        }
+        if (data?.gateStatus === "existing") {
+          toast.info(`"${sa.article.title}" is already in your queue`);
+          continue;
+        }
+
         if (data?.pack) {
           const batchRef = collectionRun ? {
             batchId: collectionRun.id,
@@ -220,6 +236,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             dbId: data.dbId,
             status: "open",
             createdAt: new Date().toISOString(),
+            lastAnalyzedAt: new Date().toISOString(),
             matchedPartner: data.matchedPartner || null,
             flytbaseMentioned: data.pack?.flytbaseMentioned || false,
             scanContext: {
@@ -249,11 +266,21 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     }
   };
 
-  const handleStatusChange = async (result: EnrichedResult, newStatus: LeadStatus) => {
+  const handleStatusChange = async (result: EnrichedResult, newStatus: LeadStatus, note?: string) => {
     if (result.dbId) {
+      // Gap 10: Fetch current status_history and append new entry
+      const { data: current } = await supabase
+        .from("opportunity_packs")
+        .select("status_history")
+        .eq("id", result.dbId)
+        .single();
+
+      const history: any[] = Array.isArray(current?.status_history) ? current.status_history : [];
+      history.push({ status: newStatus, changed_at: new Date().toISOString(), ...(note ? { note } : {}) });
+
       const { error } = await supabase
         .from("opportunity_packs")
-        .update({ status: newStatus })
+        .update({ status: newStatus, status_updated_at: new Date().toISOString(), status_history: history })
         .eq("id", result.dbId);
       if (error) {
         toast.error("Failed to update status");
@@ -266,6 +293,45 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
 
   const handleDelete = async (result: EnrichedResult) => {
     await handleStatusChange(result, "deleted");
+  };
+
+  // Gap 6: Refresh Analysis — re-run deep-dive in place, preserve status/notes
+  const handleRefreshAnalysis = async (result: EnrichedResult) => {
+    if (!result.dbId) return;
+    const key = result.dbId;
+    setRefreshingFor(key);
+    try {
+      const { data, error } = await supabase.functions.invoke("deep-dive", {
+        body: {
+          url: result.articleUrl,
+          title: result.articleTitle,
+          source: result.articleSource,
+          scanContext: result.scanContext,
+          llmProvider: provider,
+          forceRefresh: true,
+          packId: result.dbId,
+          batchContext: result.batchRef ? {
+            batchId: result.batchRef.batchId,
+            keywords: result.batchRef.keywords,
+            regions: result.batchRef.regions,
+            collectionRanAt: result.batchRef.collectionRanAt,
+          } : undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.pack) {
+        setResults((prev) => prev.map((r) =>
+          r.dbId === key
+            ? { ...r, pack: data.pack, lastAnalyzedAt: new Date().toISOString(), matchedPartner: data.matchedPartner || r.matchedPartner }
+            : r
+        ));
+        toast.success("Analysis refreshed");
+      }
+    } catch (e: any) {
+      toast.error("Refresh failed: " + e.message);
+    } finally {
+      setRefreshingFor(null);
+    }
   };
 
   const handleEmailSet = async (result: EnrichedResult, email: string) => {
@@ -290,7 +356,20 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     toast.success(newPartner ? `Email set to ${newPartner.email}` : "Email cleared");
   };
 
+  const [refreshingFor, setRefreshingFor] = useState<string | null>(null);
   const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
+
+  // Gap 4: Same-company cross-card map (company_name → list of dbIds)
+  const sameCompanyMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const r of results) {
+      const company = r.pack.companyProfile.companyName?.toLowerCase().trim();
+      if (!company || company === "unknown") continue;
+      if (!map.has(company)) map.set(company, []);
+      if (r.dbId) map.get(company)!.push(r.dbId);
+    }
+    return map;
+  }, [results]);
 
   const handleSendToPartner = async (result: EnrichedResult) => {
     if (!result.matchedPartner) {
@@ -409,6 +488,17 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     const location = [sc?.city, sc?.country].filter(Boolean).join(", ") || r.pack.companyProfile.deploymentRegion || "—";
     const involvedParties = sc?.involvedParties;
 
+    // Gap 6: Staleness — warn if last analyzed > 60 days ago
+    const isStale = r.lastAnalyzedAt
+      ? (Date.now() - new Date(r.lastAnalyzedAt).getTime()) > 60 * 24 * 60 * 60 * 1000
+      : false;
+
+    // Gap 4: Same-company badge
+    const company = r.pack.companyProfile.companyName?.toLowerCase().trim();
+    const otherCompanyCards = company && company !== "unknown"
+      ? (sameCompanyMap.get(company) || []).filter(id => id !== r.dbId)
+      : [];
+
     return (
       <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
         <td className="py-2 px-2 text-muted-foreground tabular-nums align-top">{i + 1}</td>
@@ -418,6 +508,17 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               <Badge variant="outline" className={`text-[9px] px-1.5 py-0 w-fit border ${SOURCE_COLORS[r.articleSource as keyof typeof SOURCE_COLORS] || ""}`}>
                 {SOURCE_LABELS[r.articleSource as keyof typeof SOURCE_LABELS] || r.articleSource}
               </Badge>
+            )}
+            {isStale && (
+              <span className="text-[9px] px-1.5 py-0 rounded-full bg-amber-100 text-amber-700 border border-amber-200 w-fit">
+                Analysis outdated
+              </span>
+            )}
+            {otherCompanyCards.length > 0 && (
+              <span className="text-[9px] px-1.5 py-0 rounded-full bg-blue-50 text-blue-600 border border-blue-200 w-fit inline-flex items-center gap-0.5">
+                <Building2 className="w-2.5 h-2.5" />
+                {otherCompanyCards.length} other card{otherCompanyCards.length > 1 ? "s" : ""}
+              </span>
             )}
             <a href={r.articleUrl} target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary hover:underline text-[11px] break-words leading-tight inline-flex items-start gap-0.5">
               <span className="line-clamp-2">{r.articleTitle}</span>
@@ -524,6 +625,16 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 Dup
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleRefreshAnalysis(r)}
+              disabled={refreshingFor === r.dbId}
+              className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary"
+              title="Refresh analysis"
+            >
+              {refreshingFor === r.dbId ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
               <Trash2 className="w-3 h-3" />
             </Button>
@@ -538,10 +649,39 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
 
   const renderDetailCard = (r: EnrichedResult) => {
     const sc = r.scanContext;
+
+    // Gap 6: Staleness
+    const isStale = r.lastAnalyzedAt
+      ? (Date.now() - new Date(r.lastAnalyzedAt).getTime()) > 60 * 24 * 60 * 60 * 1000
+      : false;
+
+    // Gap 4: Same-company badge
+    const company = r.pack.companyProfile.companyName?.toLowerCase().trim();
+    const otherCompanyCards = company && company !== "unknown"
+      ? (sameCompanyMap.get(company) || []).filter(id => id !== r.dbId)
+      : [];
+
     return (
       <div key={r.dbId || r.articleUrl} className="relative">
+        {/* Gap 4+6: Staleness + same-company info bar */}
+        {(isStale || otherCompanyCards.length > 0) && (
+          <div className="flex items-center gap-2 px-4 py-1.5 border border-b-0 border-amber-200 rounded-t-xl bg-amber-50/60 text-xs flex-wrap">
+            {isStale && (
+              <span className="text-amber-700 font-medium inline-flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                Analysis is over 60 days old — consider refreshing
+              </span>
+            )}
+            {otherCompanyCards.length > 0 && (
+              <span className="text-blue-600 inline-flex items-center gap-1">
+                <Building2 className="w-3 h-3" />
+                {otherCompanyCards.length} other card{otherCompanyCards.length > 1 ? "s" : ""} for {r.pack.companyProfile.companyName} in your queue
+              </span>
+            )}
+          </div>
+        )}
         {/* BD context summary bar */}
-        <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border rounded-t-xl bg-muted/30 text-xs">
+        <div className={`flex flex-wrap items-center gap-3 px-4 py-2.5 border border-border text-xs ${isStale || otherCompanyCards.length > 0 ? "" : "rounded-t-xl"} bg-muted/30`}>
           {sc?.partnerOrSI && <span className="text-foreground">🤝 Involved: {sc.partnerOrSI}</span>}
           {editingPartnerId === (r.dbId || r.articleUrl) ? (
             <div className="flex items-center gap-1">
@@ -624,6 +764,17 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 Mark Duplicate
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleRefreshAnalysis(r)}
+              disabled={refreshingFor === r.dbId}
+              className="text-xs gap-1.5 text-muted-foreground hover:text-primary"
+              title="Re-run deep-dive with latest intelligence"
+            >
+              {refreshingFor === r.dbId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Refresh
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-muted-foreground hover:text-destructive">
               <Trash2 className="w-4 h-4" />
             </Button>
