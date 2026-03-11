@@ -48,8 +48,12 @@ If multiple articles cover the SAME company doing the SAME thing (same deploymen
 INVOLVED PARTIES EXTRACTION RULE:
 - involvedParties MUST list ALL meaningful party names mentioned or inferable from the article: the buyer, deployer, operator, government agency, police department, military branch, contractor, system integrator, service provider, municipality, utility company, etc.
 - Be EXHAUSTIVE: if an article mentions "Bahia Civil Police", "OCA Drones", "City of Salvador" — list ALL of them, not just one.
-- EXCLUDE "DJI", "Skydio", "Autel", and other well-known drone manufacturers — these are search keywords, NOT actionable leads. Only include them if they are the BUYER/DEPLOYER (not just the product manufacturer).
+- ALWAYS EXCLUDE these drone hardware OEMs (they are search keywords, NOT actionable leads): DJI, Skydio, Autel, Parrot, AgEagle, Wingtra, senseFly, Freefly, Zipline, Joby. Only include them if they are the BUYER/DEPLOYER, not the product manufacturer.
 - EXCLUDE "FlytBase" — it is the user's own company.
+
+LOCATION INFERENCE RULE:
+- If country/city is not explicitly stated, infer from: phone number prefix (e.g. +971 → UAE, +44 → UK, +1 → USA/Canada, +91 → India, +65 → Singapore, +61 → Australia, +27 → South Africa, +55 → Brazil, +49 → Germany, +33 → France), email domain (e.g. .ae → UAE, .uk → UK, .in → India, .sg → Singapore, .au → Australia, .za → South Africa, .br → Brazil), or organization name if the country is well-known.
+- Set country/city to the inferred value; do not leave null when a clear inference exists.
 - Prioritize extracting the BUYER, the OPERATOR, the CONTRACTOR, the GOVERNMENT AGENCY, the SYSTEM INTEGRATOR, the SERVICE PROVIDER, the RESELLER/DEALER — these are the actionable leads.
 - If the article mentions a specific department, division, or named entity within a larger organization, include the specific name (e.g. "Bahia Civil Police" not just "Police").
 - For articles involving drone service providers or resellers (e.g. Heliguy, DroneUp), ALWAYS include them — they are potential FlytBase partners.
@@ -92,6 +96,11 @@ const BATCH_SCORING_TOOL = {
                 type: "array",
                 items: { type: "string" },
                 description: "All email addresses explicitly mentioned in the article text, if any.",
+              },
+              phonesMentioned: {
+                type: "array",
+                items: { type: "string" },
+                description: "All phone numbers explicitly mentioned in the article text (e.g. '+971 4 123 4567'), if any.",
               },
               useCaseCategory: { type: ["string", "null"], description: "Short use-case label (2-4 words max, English). E.g. 'Power Line Inspection', 'Port Security', 'Construction Monitoring', 'Emergency Response', 'Agriculture Spraying', 'Mining Survey'. Null if unclear." },
               buyingIntentType: {
@@ -157,7 +166,8 @@ You MUST return structured output using the provided tool, and you MUST:
 
 MAPPING RULES (LinkedIn):
 - involvedParties: single array field that MUST include BOTH the buyer organization and any meaningful partners/system integrators/service providers. Do NOT use separate "company" or "partner" fields — everything goes into involvedParties.
-- country / city: infer from profile, text, or link when possible; otherwise null.
+- ALWAYS EXCLUDE these drone hardware OEMs from involvedParties: DJI, Skydio, Autel, Parrot, AgEagle, Wingtra, senseFly, Freefly. Only include them if they are the BUYER/DEPLOYER.
+- country / city: infer from profile, text, or contact details when possible. Use phone prefix (+971 → UAE, +44 → UK, +1 → USA, +91 → India, +65 → Singapore, +61 → Australia, +27 → South Africa, +55 → Brazil, +49 → Germany, +33 → France) or email domain (.ae → UAE, .uk → UK, .in → India, .sg → Singapore, .au → Australia) to infer country when not stated explicitly.
 - buyingIntentType: LIVE_DEPLOYMENT, CONTRACT_AWARD, TENDER, PARTNER_ANNOUNCEMENT, EXPANSION, FUNDING, REGULATION, OTHER.
 - pocName: include ALL key people mentioned in the post (author and any quoted stakeholders). Format as a single string such as "Name1 @ Org1; Name2, Role at Org2". Set to null only if truly no people are mentioned.
 - whyItMatters: one concise English sentence explaining why this is a strong lead (or why it is weak/dropped).
@@ -211,6 +221,12 @@ const LINKEDIN_SCORING_TOOL = {
                 items: { type: "string" },
                 description:
                   "All email addresses explicitly mentioned in the LinkedIn post text, if any.",
+              },
+              phonesMentioned: {
+                type: "array",
+                items: { type: "string" },
+                description:
+                  "All phone numbers explicitly mentioned in the LinkedIn post text (e.g. '+971 4 123 4567'), if any.",
               },
               useCaseCategory: {
                 type: ["string", "null"],
@@ -361,6 +377,8 @@ serve(async (req) => {
             dealValue: cachedScore.deal_value || null,
             pocName: cachedScore.poc_name || null,
             emailsMentioned: cachedScore.emails_mentioned || [],
+            phonesMentioned: cachedScore.phones_mentioned || [],
+            authorSocialHandle: cachedScore.author_social_handle || null,
             useCaseCategory: cachedScore.use_case_category || null,
             buyingIntentType: cachedScore.buying_intent_type,
             leadClarityScore: cachedScore.lead_clarity_score,
@@ -526,6 +544,7 @@ serve(async (req) => {
                       deal_value: scan.dealValue || null,
                       poc_name: scan.pocName || null,
                       emails_mentioned: scan.emailsMentioned || null,
+                      phones_mentioned: scan.phonesMentioned || null,
                       use_case_category: scan.useCaseCategory || null,
                       buying_intent_type: scan.buyingIntentType,
                       lead_clarity_score: scan.leadClarityScore,
@@ -722,6 +741,9 @@ serve(async (req) => {
                         deal_value: scan.dealValue || null,
                         poc_name: scan.pocName || null,
                         emails_mentioned: scan.emailsMentioned || null,
+                        phones_mentioned: scan.phonesMentioned || null,
+                        // Post URL is the best social reference we have for the author
+                        author_social_handle: article.url || null,
                         use_case_category: scan.useCaseCategory || null,
                         buying_intent_type: scan.buyingIntentType,
                         lead_clarity_score: scan.leadClarityScore,
@@ -736,16 +758,11 @@ serve(async (req) => {
                     );
 
                     if (isRelevant) {
-                      results.push({
-                        article,
-                        scan: { ...scan, dropReason: null },
-                      });
+                      const enrichedScan = { ...scan, dropReason: null, authorSocialHandle: article.url || null };
+                      results.push({ article, scan: enrichedScan });
                       send({
                         type: "result",
-                        data: {
-                          article,
-                          scan: { ...scan, dropReason: null },
-                        },
+                        data: { article, scan: enrichedScan },
                       });
                     } else {
                       send({

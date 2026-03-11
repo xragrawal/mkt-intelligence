@@ -205,6 +205,8 @@ export type Database = {
           re_associated_from_batch_id: string | null
           risk_factors: string | null
           scale_description: string | null
+          phones_mentioned: string[] | null
+          author_social_handle: string | null
           status: string
           status_history: Json | null
           status_updated_at: string | null
@@ -246,6 +248,8 @@ export type Database = {
           re_associated_from_batch_id?: string | null
           risk_factors?: string | null
           scale_description?: string | null
+          phones_mentioned?: string[] | null
+          author_social_handle?: string | null
           status?: string
           status_history?: Json | null
           status_updated_at?: string | null
@@ -287,6 +291,8 @@ export type Database = {
           re_associated_from_batch_id?: string | null
           risk_factors?: string | null
           scale_description?: string | null
+          phones_mentioned?: string[] | null
+          author_social_handle?: string | null
           status?: string
           status_history?: Json | null
           status_updated_at?: string | null
@@ -317,6 +323,8 @@ export type Database = {
           partner_or_si: string | null
           poc_name: string | null
           emails_mentioned: string[] | null
+          phones_mentioned: string[] | null
+          author_social_handle: string | null
           source: string | null
           source_quality_score: number | null
           units_mentioned: number | null
@@ -343,6 +351,8 @@ export type Database = {
           partner_or_si?: string | null
           poc_name?: string | null
           emails_mentioned?: string[] | null
+          phones_mentioned?: string[] | null
+          author_social_handle?: string | null
           source?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null
@@ -369,6 +379,8 @@ export type Database = {
           partner_or_si?: string | null
           poc_name?: string | null
           emails_mentioned?: string[] | null
+          phones_mentioned?: string[] | null
+          author_social_handle?: string | null
           source?: string | null
           source_quality_score?: number | null
           units_mentioned?: number | null

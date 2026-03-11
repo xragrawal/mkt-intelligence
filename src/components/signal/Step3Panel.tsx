@@ -36,9 +36,12 @@ interface EnrichedResult {
     dealValue?: string | null;
     pocName?: string | null;
     emailsMentioned?: string[];
+    phonesMentioned?: string[];
+    authorSocialHandle?: string | null;
     buyingIntentType?: string;
     confidence?: string;
     bdImpactScore?: number;
+    useCaseCategory?: string | null;
   };
   batchRef?: {
     batchId?: string;
@@ -158,6 +161,10 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             },
             crmReadyNotes: row.crm_ready_notes || "",
           },
+          scanContext: {
+            phonesMentioned: row.phones_mentioned || [],
+            authorSocialHandle: row.author_social_handle || null,
+          },
         }));
         setResults(loaded);
       }
@@ -206,6 +213,10 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           toast.error(`Failed for "${sa.article.title}": ${error.message}`);
           continue;
         }
+        if (data?.error) {
+          toast.warning(`Analysis failed for "${sa.article.title}": ${data.error}`);
+          continue;
+        }
 
         // Gate 3 responses
         if (data?.gateStatus === "blocked") {
@@ -249,9 +260,12 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               dealValue: sa.scan.dealValue || null,
               pocName: sa.scan.pocName || null,
               emailsMentioned: sa.scan.emailsMentioned || [],
+              phonesMentioned: sa.scan.phonesMentioned || [],
+              authorSocialHandle: sa.scan.authorSocialHandle || null,
               buyingIntentType: sa.scan.buyingIntentType,
               confidence: sa.scan.confidence,
               bdImpactScore: sa.scan.bdImpactScore,
+              useCaseCategory: sa.scan.useCaseCategory || null,
             },
             batchRef,
           };
@@ -540,14 +554,25 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             );
           })()}
         </td>
-        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 160 }}>
+        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 120 }}>
+          {sc?.useCaseCategory || "—"}
+        </td>
+        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 140 }}>
+          {sc?.pocName || "—"}
+        </td>
+        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 150 }}>
           <div className="flex flex-col gap-0.5">
-            <span>{sc?.pocName || "—"}</span>
-            {sc?.emailsMentioned && sc.emailsMentioned.length > 0 && (
-              <span className="text-[10px] text-muted-foreground break-all line-clamp-2" title={sc.emailsMentioned.join(", ")}>
+            {sc?.emailsMentioned && sc.emailsMentioned.length > 0 ? (
+              <span className="text-[10px] text-muted-foreground break-all line-clamp-1" title={sc.emailsMentioned.join(", ")}>
                 {sc.emailsMentioned.join(", ")}
               </span>
-            )}
+            ) : null}
+            {sc?.phonesMentioned && sc.phonesMentioned.length > 0 ? (
+              <span className="text-[10px] text-muted-foreground break-all line-clamp-1" title={sc.phonesMentioned.join(", ")}>
+                📞 {sc.phonesMentioned.join(", ")}
+              </span>
+            ) : null}
+            {!sc?.emailsMentioned?.length && !sc?.phonesMentioned?.length ? "—" : null}
           </div>
         </td>
         <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
@@ -600,8 +625,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
         <td className="py-2 px-2 text-right align-top">
           <div className="flex flex-wrap items-center gap-0.5 justify-end">
             {r.status !== "acted_internally" && (
-              <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
-                <Briefcase className="w-3 h-3" /> CRM
+              <Button variant="ghost" size="sm" disabled className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground opacity-50 cursor-not-allowed">
+                <Briefcase className="w-3 h-3" /> Slack it
               </Button>
             )}
             <Button
@@ -618,7 +643,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
               className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary"
             >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Email
+              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Send email
             </Button>
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
@@ -739,8 +764,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           )}
           <div className="flex items-center gap-1 ml-auto flex-wrap">
             {r.status !== "acted_internally" && (
-              <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "acted_internally")} className="text-xs gap-1.5 text-muted-foreground hover:text-foreground">
-                <Briefcase className="w-3.5 h-3.5" /> Add to CRM
+              <Button variant="ghost" size="sm" disabled className="text-xs gap-1.5 text-muted-foreground opacity-50 cursor-not-allowed">
+                <Briefcase className="w-3.5 h-3.5" /> Slack it
               </Button>
             )}
             <Button
@@ -757,7 +782,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
               className="text-xs gap-1.5 text-muted-foreground hover:text-primary"
             >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Email
+              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Send email
             </Button>
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
@@ -799,7 +824,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">#</th>
                 <th className="py-2 px-2 font-medium">Source Article</th>
                 <th className="py-2 px-2 font-medium">Involved Parties</th>
+                <th className="py-2 px-2 font-medium">Use Case</th>
                 <th className="py-2 px-2 font-medium">PoC</th>
+                <th className="py-2 px-2 font-medium">Contact</th>
                 <th className="py-2 px-2 font-medium">Location</th>
                 <th className="py-2 px-2 font-medium">Email</th>
                 <th className="py-2 px-2 font-medium">Status</th>

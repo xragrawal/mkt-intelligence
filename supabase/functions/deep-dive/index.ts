@@ -369,6 +369,8 @@ serve(async (req) => {
       if (scanContext.whyItMatters) contextParts.push(`Why It Matters: ${scanContext.whyItMatters}`);
       if (scanContext.bdImpactScore) contextParts.push(`Impact Score: ${scanContext.bdImpactScore}`);
       if (scanContext.unitsMentioned) contextParts.push(`Units Mentioned: ${scanContext.unitsMentioned}`);
+      if (scanContext.emailsMentioned?.length) contextParts.push(`Emails: ${scanContext.emailsMentioned.join(", ")}`);
+      if (scanContext.phonesMentioned?.length) contextParts.push(`Phones: ${scanContext.phonesMentioned.join(", ")}`);
     }
 
     const result = await callLLM({
@@ -379,7 +381,12 @@ serve(async (req) => {
       provider: llmProvider || undefined,
     });
 
-    if (!result.toolCall) throw new Error("No structured output from AI");
+    if (!result.toolCall) {
+      return new Response(
+        JSON.stringify({ error: "No structured output from AI. Try again or switch provider." }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const pack = JSON.parse(result.toolCall.arguments);
 
@@ -432,6 +439,8 @@ serve(async (req) => {
       matched_partner_email: matchedPartner?.email || null,
       flytbase_mentioned: pack.flytbaseMentioned || false,
       last_analyzed_at: now,
+      phones_mentioned: scanContext?.phonesMentioned?.length ? scanContext.phonesMentioned : null,
+      author_social_handle: scanContext?.authorSocialHandle || null,
     };
 
     let dbId: string | null = null;

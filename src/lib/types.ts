@@ -41,6 +41,8 @@ export interface ArticleScanResult {
   dealValue: string | null;
   pocName: string | null;
   emailsMentioned: string[];
+  phonesMentioned: string[];
+  authorSocialHandle: string | null;
   useCaseCategory: string | null;
   buyingIntentType: BuyingIntentType;
   leadClarityScore: number;

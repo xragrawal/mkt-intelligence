@@ -1,0 +1,11 @@
+## Check remote is configured
+git remote -v
+
+## Stage changes
+git add .
+
+## Commit
+git commit -m "Your message here"
+
+## Push to GitHub
+git push origin main
