@@ -164,6 +164,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           scanContext: {
             phonesMentioned: row.phones_mentioned || [],
             authorSocialHandle: row.author_social_handle || null,
+            pocName: row.poc_name || null,
+            useCaseCategory: row.use_case_category || null,
           },
         }));
         setResults(loaded);
@@ -239,6 +241,17 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             regions: collectionRun.regions,
             collectionRanAt: collectionRun.started_at,
           } : undefined;
+
+          // Extract pocName from deep-dive's peopleOfContact array
+          let pocName: string | null = null;
+          if (data.pack.peopleOfContact && data.pack.peopleOfContact.length > 0) {
+            const poc = data.pack.peopleOfContact[0];
+            const parts = [poc.name];
+            if (poc.titleOrRole) parts.push(`${poc.titleOrRole}`);
+            if (poc.organization) parts.push(`@ ${poc.organization}`);
+            pocName = parts.join(" ");
+          }
+
           const newResult: EnrichedResult = {
             articleUrl: sa.article.url,
             articleTitle: sa.article.title,
@@ -258,14 +271,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               unitsMentioned: sa.scan.unitsMentioned,
               involvedParties: sa.scan.involvedParties || [],
               dealValue: sa.scan.dealValue || null,
-              pocName: sa.scan.pocName || null,
+              pocName: pocName,
               emailsMentioned: sa.scan.emailsMentioned || [],
               phonesMentioned: sa.scan.phonesMentioned || [],
               authorSocialHandle: sa.scan.authorSocialHandle || null,
               buyingIntentType: sa.scan.buyingIntentType,
               confidence: sa.scan.confidence,
               bdImpactScore: sa.scan.bdImpactScore,
-              useCaseCategory: sa.scan.useCaseCategory || null,
+              useCaseCategory: data.pack.useCaseCategory || null,
             },
             batchRef,
           };

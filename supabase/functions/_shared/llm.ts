@@ -133,7 +133,7 @@ async function callOpenAI(opts: LLMCallOptions): Promise<LLMResult> {
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
-  const model = opts.model || "gpt-5-mini";
+  const model = opts.model || "gpt-4o";
 
   const body: any = {
     model,
@@ -314,7 +314,7 @@ export class CreditsExhaustedError extends Error {
 }
 
 export const LLM_PROVIDERS: { id: LLMProvider; label: string; model: string }[] = [
-  { id: "openai", label: "GPT-4o mini", model: "gpt-5-mini" },
+  { id: "openai", label: "GPT-4o", model: "gpt-4o" },
   { id: "gemini_direct", label: "Gemini 2.5 Flash", model: "gemini-2.5-flash" },
   { id: "lovable", label: "Lovable AI", model: "google/gemini-3-flash-preview" },
   { id: "claude", label: "Claude Sonnet 4", model: "claude-sonnet-4-6" },

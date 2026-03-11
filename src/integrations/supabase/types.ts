@@ -207,6 +207,8 @@ export type Database = {
           scale_description: string | null
           phones_mentioned: string[] | null
           author_social_handle: string | null
+          poc_name: string | null
+          use_case_category: string | null
           status: string
           status_history: Json | null
           status_updated_at: string | null
@@ -250,6 +252,8 @@ export type Database = {
           scale_description?: string | null
           phones_mentioned?: string[] | null
           author_social_handle?: string | null
+          poc_name?: string | null
+          use_case_category?: string | null
           status?: string
           status_history?: Json | null
           status_updated_at?: string | null
@@ -293,6 +297,8 @@ export type Database = {
           scale_description?: string | null
           phones_mentioned?: string[] | null
           author_social_handle?: string | null
+          poc_name?: string | null
+          use_case_category?: string | null
           status?: string
           status_history?: Json | null
           status_updated_at?: string | null

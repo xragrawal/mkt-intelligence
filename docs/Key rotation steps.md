@@ -1,19 +1,19 @@
-To redeploy your functions on Supabase with the new Gemini API key, follow these steps:
-
-Update your local .env file with the new Gemini API key:
-
-GEMINI_API_KEY=<your_new_key>
-Link to your Supabase project (if not already linked):
+##To redeploy your functions on Supabase with the new Gemini API key, follow these steps:
 
 supabase link --project-ref zdnzgaoeniznnopikndg
-Set the secret on Supabase so the functions pick it up:
 
-supabase secrets set GEMINI_API_KEY=<your_new_key>
-Deploy the functions that use Gemini (score-articles and deep-dive):
+GEMINI_API_KEY=AIzaSyBOcOt4xXUVvvu1sfd1lu-KPQYY1DRHB1A
+
+supabase secrets set GEMINI_API_KEY=AIzaSyBOcOt4xXUVvvu1sfd1lu-KPQYY1DRHB1A
 
 supabase functions deploy score-articles deep-dive
-Verify deployment by checking the function logs in Supabase dashboard or running:
 
-supabase functions list
-Then truncate your tables to clear old data before the fresh test:
 
+
+##Switch to OpenAI (quick test):
+
+##Set the provider and API key on Supabase:
+
+##supabase secrets set LLM_PROVIDER=openai
+##supabase secrets set OPENAI_API_KEY=<your_openai_key>
+##supabase functions deploy score-articles deep-dive

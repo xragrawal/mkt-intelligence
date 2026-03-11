@@ -156,15 +156,20 @@ FIELD-LEVEL RULES:
 - If no people are mentioned, output an empty array []
 
 [involvedParties]
-- Include ALL relevant companies/organizations mentioned (operators/buyers, vendors, OEMs, integrators, regulators, partners, contractors, agencies, event organizers)
+- Include ALL relevant companies/organizations mentioned (operators/buyers, vendors, integrators, regulators, partners, contractors, agencies, event organizers)
+- EXCLUDE DJI UNLESS it is the primary BUYER/OPERATOR (e.g., "DJI deploys drones at X location"). DJI is the search keyword; we want to see competitors/operators instead.
 - Each entry must be an object with:
   - name (required; full official name when possible)
   - partyType (choose one: Buyer/Operator, Vendor/OEM, System Integrator, Government/Regulator, Partner, Customer, Investor/Funder, Media/Publisher, Other)
   - countryOrRegion (null if not stated)
   - relationshipToPrimaryCompany (short string, e.g. "buyer", "operator", "vendor", "partner", or null if unclear)
   - mentionContext (short description of why they are involved)
-- Do NOT omit parties just because they are not the primary buyer/operator.
 - If no companies/organizations are mentioned, DO NOT invent, output an empty array []
+
+[useCaseCategory]
+- The primary use case category: Security & Surveillance, Logistics & Delivery, Infrastructure Inspection, Agriculture, Emergency Services, Defense & Military, Construction, Energy & Utilities, Mining, Public Safety, Smart Cities, or Other
+- Infer from the article context and companyProfile.inferredIndustry
+- null if no clear use case emerges
 
 ---
 
@@ -259,6 +264,7 @@ const DEEP_DIVE_TOOL = {
         },
         crmReadyNotes: { type: "string" },
         flytbaseMentioned: { type: "boolean", description: "true if FlytBase is mentioned in the article title or context" },
+        useCaseCategory: { type: ["string", "null"], description: "Primary use case category" },
       },
       required: [
         "peopleOfContact",
@@ -268,6 +274,7 @@ const DEEP_DIVE_TOOL = {
         "bdOpportunityAssessment",
         "crmReadyNotes",
         "flytbaseMentioned",
+        "useCaseCategory",
       ],
       additionalProperties: false,
     },
@@ -390,6 +397,16 @@ serve(async (req) => {
 
     const pack = JSON.parse(result.toolCall.arguments);
 
+    // Extract pocName from peopleOfContact array (first person, or highest-ranking)
+    let pocName: string | null = null;
+    if (pack.peopleOfContact && pack.peopleOfContact.length > 0) {
+      const poc = pack.peopleOfContact[0];
+      const parts = [poc.name];
+      if (poc.titleOrRole) parts.push(`${poc.titleOrRole}`);
+      if (poc.organization) parts.push(`@ ${poc.organization}`);
+      pocName = parts.join(" ");
+    }
+
     // Match FlytBase partner by region
     let matchedPartner: { name: string; email: string } | null = null;
     const deploymentRegion = pack.companyProfile.deploymentRegion || "";
@@ -441,6 +458,8 @@ serve(async (req) => {
       last_analyzed_at: now,
       phones_mentioned: scanContext?.phonesMentioned?.length ? scanContext.phonesMentioned : null,
       author_social_handle: scanContext?.authorSocialHandle || null,
+      poc_name: pocName,
+      use_case_category: pack.useCaseCategory || null,
     };
 
     let dbId: string | null = null;
