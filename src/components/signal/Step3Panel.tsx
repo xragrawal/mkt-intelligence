@@ -2,9 +2,14 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, ChevronRight, Mail, Edit2, Check, AlertTriangle, RefreshCw, Building2, Newspaper, Linkedin, Facebook, Slack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
 import type { ScoredArticle, OpportunityPack, LeadStatus, BuyingIntentType, CollectionRunSummary } from "@/lib/types";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, SIGNAL_LABELS, SOURCE_LABELS, SOURCE_COLORS } from "@/lib/types";
+import { buildEmail, type EmailParams } from "@/lib/email-builder";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLLMProvider } from "@/lib/llm-context";
@@ -107,6 +112,10 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [showCurrentRunSection, setShowCurrentRunSection] = useState(true);
   const [showPreviousRunsSection, setShowPreviousRunsSection] = useState(true);
   const [batchesInitialized, setBatchesInitialized] = useState(false);
+  const [draftEmailFor, setDraftEmailFor] = useState<EnrichedResult | null>(null);
+  const [draftSubject, setDraftSubject] = useState<string>("");
+  const [draftBody, setDraftBody] = useState<string>("");
+  const [isDraftSending, setIsDraftSending] = useState(false);
   const { provider } = useLLMProvider();
 
   useEffect(() => {
@@ -450,46 +459,38 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
 
   const handleSendToPartner = async (result: EnrichedResult) => {
     if (!result.matchedPartner?.email) {
-      toast.error("No recipient email found — please enter and save an email first");
+      const id = result.dbId || result.articleUrl;
+      setEditingPartnerId(id);
+      toast.info("Enter a recipient email and click the checkmark to save it, then click Send email.");
       return;
     }
-    const key = result.dbId || result.articleUrl;
-    setSendingEmailFor(key);
+
     try {
       const sc = result.scanContext;
-      const { data, error } = await supabase.functions.invoke("send-partner-email", {
-        body: {
-          // Recipient
-          partnerName: result.matchedPartner.name,
-          partnerEmail: result.matchedPartner.email,
-          // Prospect context
-          pocName: sc?.pocName || null,
-          companyName: result.pack.companyProfile.companyName,
-          inferredIndustry: result.pack.companyProfile.inferredIndustry,
-          deploymentRegion: result.pack.companyProfile.deploymentRegion,
-          country: sc?.country || null,
-          eventType: result.pack.deploymentSignal.eventType,
-          involvedParties: sc?.involvedParties || [],
-          unitsMentioned: sc?.unitsMentioned || null,
-          // Article
-          articleTitle: result.articleTitle,
-          articleUrl: result.articleUrl,
-          // AI intelligence
-          whyThisIsHot: result.pack.bdOpportunityAssessment.whyThisIsHot,
-          strategicEntryPoint: result.pack.bdOpportunityAssessment.strategicEntryPoint,
-        },
-      });
-      if (error) throw error;
-      if (data?.success) {
-        toast.success(`Prospect email sent to ${result.matchedPartner.name}`);
-        await handleStatusChange(result, "shared_with_partners");
-      } else {
-        toast.error(data?.error || "Failed to send email");
-      }
+      const emailParams: EmailParams = {
+        partnerName: result.matchedPartner.name,
+        partnerEmail: result.matchedPartner.email,
+        pocName: sc?.pocName || null,
+        companyName: result.pack.companyProfile.companyName,
+        inferredIndustry: result.pack.companyProfile.inferredIndustry,
+        deploymentRegion: result.pack.companyProfile.deploymentRegion,
+        country: sc?.country || null,
+        eventType: result.pack.deploymentSignal.eventType,
+        unitsMentioned: sc?.unitsMentioned || null,
+        articleTitle: result.articleTitle,
+        articleUrl: result.articleUrl,
+        whyThisIsHot: result.pack.bdOpportunityAssessment.whyThisIsHot,
+        strategicEntryPoint: result.pack.bdOpportunityAssessment.strategicEntryPoint,
+        useCaseCategory: sc?.useCaseCategory || null,
+      };
+
+      const { subject, textBody } = buildEmail(emailParams);
+      setDraftSubject(subject);
+      setDraftBody(textBody);
+      setDraftEmailFor(result);
     } catch (e: any) {
-      toast.error("Email failed: " + e.message);
-    } finally {
-      setSendingEmailFor(null);
+      console.error("Failed to generate email draft:", e);
+      toast.error("Failed to generate email draft. Please try again.");
     }
   };
 
@@ -761,6 +762,49 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 + {additionalContactsCount} more contact{additionalContactsCount > 1 ? "s" : ""}
               </span>
             )}
+
+            {/* Partner email inline editor (for sending/Slack) */}
+            <div className="mt-1">
+              {editingPartnerId === (r.dbId || r.articleUrl) ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="email"
+                    autoFocus
+                    placeholder="partner@email"
+                    defaultValue={r.matchedPartner?.email || ""}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleEmailSet(r, emailDraft || (e.target as HTMLInputElement).value);
+                      if (e.key === "Escape") { setEditingPartnerId(null); setEmailDraft(""); }
+                    }}
+                    className="w-full bg-background border border-border rounded px-1.5 py-0.5 text-[11px] text-foreground min-w-0"
+                  />
+                  <button
+                    onClick={() => handleEmailSet(r, emailDraft)}
+                    className="p-0.5 text-primary hover:text-primary/80 shrink-0"
+                    title="Save partner email"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => { setEditingPartnerId(null); setEmailDraft(""); }}
+                    className="p-0.5 text-muted-foreground hover:text-foreground shrink-0"
+                    title="Cancel"
+                  >
+                    <XCircle className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setEditingPartnerId(r.dbId || r.articleUrl); setEmailDraft(r.matchedPartner?.email || ""); }}
+                  className="text-[10px] text-muted-foreground hover:text-primary inline-flex items-center gap-1"
+                  title={r.matchedPartner?.email ? "Edit partner email" : "Set partner email"}
+                >
+                  <Mail className="w-3 h-3" />
+                  {r.matchedPartner?.email || "Set partner email"}
+                </button>
+              )}
+            </div>
           </div>
         </td>
         
@@ -800,7 +844,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               }}
               disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
               className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-primary"
-              title="Draft Email"
+              title="Send email"
             >
               {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
             </Button>
@@ -1321,6 +1365,131 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           <p className="text-sm text-muted-foreground">No opportunity packs yet. Select articles in Step 2 and run Deep Dive.</p>
         </div>
       )}
+
+      {/* Draft Email Modal for partner outreach (list + detail view) */}
+      <Dialog
+        open={!!draftEmailFor}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDraftEmailFor(null);
+            setDraftSubject("");
+            setDraftBody("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {draftEmailFor
+                ? `Email to ${draftEmailFor.matchedPartner?.name || draftEmailFor.matchedPartner?.email || "partner"}`
+                : "Email draft"}
+            </DialogTitle>
+            <DialogDescription>
+              Review and edit the email before sending it to the partner. It will be sent via Ravikant's email and the opportunity will be marked as shared with partners.
+            </DialogDescription>
+          </DialogHeader>
+
+          {draftEmailFor ? (
+            <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-1">
+              <div className="space-y-2">
+                <Label>To</Label>
+                <Input
+                  value={draftEmailFor.matchedPartner?.email || ""}
+                  disabled
+                  className="bg-muted/50 text-muted-foreground"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Subject</Label>
+                <Input
+                  value={draftSubject}
+                  onChange={(e) => setDraftSubject(e.target.value)}
+                  placeholder="Email subject"
+                />
+              </div>
+
+              <div className="space-y-2 h-[calc(100%-140px)] flex flex-col min-h-[250px]">
+                <div className="flex items-center justify-between">
+                  <Label>Message</Label>
+                  <span className="text-[10px] text-muted-foreground">Plain text</span>
+                </div>
+                <Textarea
+                  value={draftBody}
+                  onChange={(e) => setDraftBody(e.target.value)}
+                  placeholder="Hi there, ..."
+                  className="flex-1 font-mono text-sm resize-none whitespace-pre-wrap leading-relaxed"
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="mt-auto pt-4 flex items-center gap-2 sm:justify-between border-t border-border">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setDraftEmailFor(null);
+                setDraftSubject("");
+                setDraftBody("");
+              }}
+              disabled={isDraftSending}
+            >
+              Discard
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!draftEmailFor || !draftEmailFor.matchedPartner?.email) return;
+                const key = draftEmailFor.dbId || draftEmailFor.articleUrl;
+                setIsDraftSending(true);
+                setSendingEmailFor(key);
+                try {
+                  const sc = draftEmailFor.scanContext;
+                  const { data, error } = await supabase.functions.invoke("send-partner-email", {
+                    body: {
+                      partnerName: draftEmailFor.matchedPartner.name,
+                      partnerEmail: draftEmailFor.matchedPartner.email,
+                      pocName: sc?.pocName || null,
+                      companyName: draftEmailFor.pack.companyProfile.companyName,
+                      inferredIndustry: draftEmailFor.pack.companyProfile.inferredIndustry,
+                      deploymentRegion: draftEmailFor.pack.companyProfile.deploymentRegion,
+                      country: sc?.country || null,
+                      eventType: draftEmailFor.pack.deploymentSignal.eventType,
+                      involvedParties: sc?.involvedParties || [],
+                      unitsMentioned: sc?.unitsMentioned || null,
+                      articleTitle: draftEmailFor.articleTitle,
+                      articleUrl: draftEmailFor.articleUrl,
+                      whyThisIsHot: draftEmailFor.pack.bdOpportunityAssessment.whyThisIsHot,
+                      strategicEntryPoint: draftEmailFor.pack.bdOpportunityAssessment.strategicEntryPoint,
+                      customSubject: draftSubject,
+                      customTextBody: draftBody,
+                    },
+                  });
+                  if (error) throw error;
+                  if (data?.success) {
+                    toast.success(`Prospect email sent to ${draftEmailFor.matchedPartner.name}`);
+                    await handleStatusChange(draftEmailFor, "shared_with_partners");
+                    setDraftEmailFor(null);
+                    setDraftSubject("");
+                    setDraftBody("");
+                  } else {
+                    toast.error(data?.error || "Failed to send email");
+                  }
+                } catch (e: any) {
+                  toast.error("Email failed: " + e.message);
+                } finally {
+                  setIsDraftSending(false);
+                  setSendingEmailFor(null);
+                }
+              }}
+              disabled={isDraftSending || !draftEmailFor?.matchedPartner?.email}
+              className="gap-2 px-6"
+            >
+              {isDraftSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+              {isDraftSending ? "Sending..." : "Send Email"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
