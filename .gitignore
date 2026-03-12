@@ -32,3 +32,6 @@ debug/
 *.sw?
 .env
 
+
+# CtxSaver - AI coding context
+.ctxsaver/

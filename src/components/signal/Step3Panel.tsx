@@ -101,6 +101,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [expandedDetailId, setExpandedDetailId] = useState<string | null>(null);
   const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
   const [emailDraft, setEmailDraft] = useState<string>("");
+  const [editingPocId, setEditingPocId] = useState<string | null>(null);
+  const [pocDraft, setPocDraft] = useState<string>("");
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
   const [batchesInitialized, setBatchesInitialized] = useState(false);
   const { provider } = useLLMProvider();
@@ -322,6 +324,26 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     await handleStatusChange(result, "deleted");
   };
 
+  const handlePackUpdate = async (dbId: string, updatedPack: OpportunityPack) => {
+    try {
+      const { error } = await supabase
+        .from("opportunity_packs")
+        .update({
+          enriched_contacts: updatedPack.enrichedContacts,
+          raw_json: updatedPack as any,
+        })
+        .eq("id", dbId);
+      
+      if (error) throw error;
+      
+      setResults((prev) => 
+        prev.map((r) => (r.dbId === dbId ? { ...r, pack: updatedPack } : r))
+      );
+    } catch (e: any) {
+      toast.error("Failed to update contact: " + e.message);
+    }
+  };
+
   // Gap 6: Refresh Analysis — re-run deep-dive in place, preserve status/notes
   const handleRefreshAnalysis = async (result: EnrichedResult) => {
     if (!result.dbId) return;
@@ -383,8 +405,34 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
     toast.success(newPartner ? `Email set to ${newPartner.email}` : "Email cleared");
   };
 
+  const handlePocSet = async (result: EnrichedResult, pocName: string) => {
+    const trimmed = pocName.trim();
+    const newPocName = trimmed || null;
+    if (result.dbId) {
+      const { error } = await supabase
+        .from("opportunity_packs")
+        .update({
+          poc_name: newPocName,
+        })
+        .eq("id", result.dbId);
+      if (error) {
+        toast.error("Failed to save POC");
+        return;
+      }
+    }
+    setResults((prev) => prev.map((r) => 
+      isSameResult(r, result) 
+        ? { ...r, scanContext: { ...r.scanContext, pocName: newPocName } } 
+        : r
+    ));
+    setEditingPocId(null);
+    setPocDraft("");
+    toast.success(newPocName ? `POC updated to ${newPocName}` : "POC cleared");
+  };
+
   const [refreshingFor, setRefreshingFor] = useState<string | null>(null);
   const [sendingEmailFor, setSendingEmailFor] = useState<string | null>(null);
+  const [slackingFor, setSlackingFor] = useState<string | null>(null);
 
   // Gap 4: Same-company cross-card map (company_name → list of dbIds)
   const sameCompanyMap = useMemo(() => {
@@ -440,6 +488,48 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
       toast.error("Email failed: " + e.message);
     } finally {
       setSendingEmailFor(null);
+    }
+  };
+
+  const handleSlackIt = async (result: EnrichedResult) => {
+    if (!result.matchedPartner) {
+      setEditingPartnerId(result.dbId || result.articleUrl);
+      toast.info("Enter a recipient email first, then click Slack it");
+      return;
+    }
+    const key = result.dbId || result.articleUrl;
+    setSlackingFor(key);
+    try {
+      const sc = result.scanContext;
+      const { data, error } = await supabase.functions.invoke("slack-approval-request", {
+        body: {
+          opportunityPackId: result.dbId,
+          partnerName: result.matchedPartner.name,
+          partnerEmail: result.matchedPartner.email,
+          pocName: sc?.pocName || null,
+          companyName: result.pack.companyProfile.companyName,
+          inferredIndustry: result.pack.companyProfile.inferredIndustry,
+          deploymentRegion: result.pack.companyProfile.deploymentRegion,
+          country: sc?.country || null,
+          eventType: result.pack.deploymentSignal.eventType,
+          unitsMentioned: sc?.unitsMentioned || null,
+          articleTitle: result.articleTitle,
+          articleUrl: result.articleUrl,
+          whyThisIsHot: result.pack.bdOpportunityAssessment.whyThisIsHot,
+          strategicEntryPoint: result.pack.bdOpportunityAssessment.strategicEntryPoint,
+          useCaseCategory: sc?.useCaseCategory || null,
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Slack DM sent for approval — check Flytbase LeadGen Bot`);
+      } else {
+        toast.error(data?.error || "Failed to send Slack approval request");
+      }
+    } catch (e: any) {
+      toast.error("Slack it failed: " + e.message);
+    } finally {
+      setSlackingFor(null);
     }
   };
 
@@ -526,9 +616,15 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
       ? (sameCompanyMap.get(company) || []).filter(id => id !== r.dbId)
       : [];
 
+    const enrichedContacts = r.pack.enrichedContacts || [];
+    const primaryContact = enrichedContacts.length > 0 ? enrichedContacts[0] : null;
+    const additionalContactsCount = enrichedContacts.length > 1 ? enrichedContacts.length - 1 : 0;
+
     return (
       <tr key={r.dbId || i} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
         <td className="py-2 px-2 text-muted-foreground tabular-nums align-top">{i + 1}</td>
+        
+        {/* Source Article */}
         <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
           <div className="flex flex-col gap-1">
             {r.articleSource && (
@@ -553,127 +649,133 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             </a>
           </div>
         </td>
+        
+        {/* Involved Parties */}
         <td className="py-2 px-2 align-top" style={{ maxWidth: 180 }}>
-          {(() => {
-            const companyName = r.pack.companyProfile.companyName;
-            const parties = [
-              ...(companyName && companyName !== "Unknown" ? [companyName] : []),
-              ...(involvedParties || []).filter((p: string) => p !== companyName),
-              ...(sc?.partnerOrSI && sc.partnerOrSI !== companyName ? [sc.partnerOrSI] : []),
-            ].filter(Boolean);
-            const display = parties.length > 0 ? parties.join(", ") : "—";
-            return (
-              <div className="font-medium text-foreground break-words leading-tight line-clamp-2" title={display}>{display}</div>
-            );
-          })()}
+          <div className="flex flex-col gap-1 text-[11px] leading-tight break-words">
+            {(() => {
+              const companyName = r.pack.companyProfile.companyName;
+              return (
+                <div className="font-medium text-foreground">
+                  {companyName !== "Unknown" ? companyName : "—"}
+                </div>
+              );
+            })()}
+            {primaryContact?.companyWebsite && (
+               <a href={primaryContact.companyWebsite.startsWith("http") ? primaryContact.companyWebsite : `https://${primaryContact.companyWebsite}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">
+                 {primaryContact.companyWebsite.length > 25 ? "Website ↗" : primaryContact.companyWebsite}
+               </a>
+             )}
+            {(() => {
+              const companyName = r.pack.companyProfile.companyName;
+              const parties = [
+                ...(involvedParties || []).filter((p: string) => p !== companyName),
+                ...(sc?.partnerOrSI && sc.partnerOrSI !== companyName ? [sc.partnerOrSI] : []),
+              ].filter(Boolean);
+              
+              if (parties.length > 0) {
+                return <div className="text-muted-foreground mt-1 text-[10px] space-y-0.5" title={parties.join(", ")}>
+                  {parties.map((p, idx) => <span key={idx} className="block truncate">• {p}</span>)}
+                </div>;
+              }
+              return null;
+            })()}
+          </div>
         </td>
+        
+        {/* Use Case */}
         <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 120 }}>
           {sc?.useCaseCategory || "—"}
         </td>
-        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 140 }}>
-          {sc?.pocName || "—"}
-        </td>
-        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 150 }}>
-          <div className="flex flex-col gap-0.5">
-            {sc?.emailsMentioned && sc.emailsMentioned.length > 0 ? (
-              <span className="text-[10px] text-muted-foreground break-all line-clamp-1" title={sc.emailsMentioned.join(", ")}>
+        
+        {/* Primary POC */}
+        <td className="py-2 px-2 text-foreground align-top text-[11px]" style={{ maxWidth: 180 }}>
+          <div className="flex flex-col gap-1">
+            {editingPocId === (r.dbId || r.articleUrl) ? (
+              <div className="flex items-center gap-1 mb-1">
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="POC name & title"
+                  defaultValue={sc?.pocName || ""}
+                  onChange={(e) => setPocDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handlePocSet(r, pocDraft || (e.target as HTMLInputElement).value);
+                    if (e.key === "Escape") { setEditingPocId(null); setPocDraft(""); }
+                  }}
+                  className="w-full bg-background border border-border rounded px-1.5 py-0.5 text-foreground min-w-0"
+                />
+                <button
+                  onClick={() => handlePocSet(r, pocDraft)}
+                  className="p-0.5 text-primary hover:text-primary/80 shrink-0"
+                >
+                  <Check className="w-3 h-3" />
+                </button>
+                <button onClick={() => { setEditingPocId(null); setPocDraft(""); }} className="p-0.5 text-muted-foreground hover:text-foreground shrink-0">
+                  <XCircle className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-start gap-1 font-medium">
+                <span className="truncate" title={primaryContact ? primaryContact.personName || "Unknown" : (sc?.pocName || "—")}>
+                  {primaryContact ? primaryContact.personName || "Unknown" : (sc?.pocName || "—")}
+                </span>
+                <button
+                  onClick={() => { setEditingPocId(r.dbId || r.articleUrl); setPocDraft(sc?.pocName || ""); }}
+                  className="p-0.5 text-muted-foreground hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Edit POC Name manually"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            
+            {primaryContact?.title && (
+              <span className="text-muted-foreground truncate" title={primaryContact.title}>{primaryContact.title}</span>
+            )}
+            
+            {primaryContact?.email ? (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="truncate" title={primaryContact.email}>{primaryContact.email}</span>
+                {primaryContact.emailConfidence === "Verified" ? (
+                  <span className="shrink-0 w-2 h-2 rounded-full bg-green-500" title="Verified by Hunter" />
+                ) : primaryContact.emailConfidence === "Estimated" ? (
+                  <span className="shrink-0 w-2 h-2 rounded-full bg-yellow-400" title="Estimated" />
+                ) : (
+                  <span className="shrink-0 w-2 h-2 rounded-full bg-red-500" title="Invalid/Not Found" />
+                )}
+              </div>
+            ) : sc?.emailsMentioned && sc.emailsMentioned.length > 0 ? (
+              <span className="text-[10px] text-muted-foreground break-all line-clamp-1 truncate" title={sc.emailsMentioned.join(", ")}>
                 {sc.emailsMentioned.join(", ")}
               </span>
             ) : null}
-            {sc?.phonesMentioned && sc.phonesMentioned.length > 0 ? (
-              <span className="text-[10px] text-muted-foreground break-all line-clamp-1" title={sc.phonesMentioned.join(", ")}>
-                📞 {sc.phonesMentioned.join(", ")}
+            
+            {additionalContactsCount > 0 && (
+              <span className="text-[10px] text-primary mt-1">
+                + {additionalContactsCount} more contact{additionalContactsCount > 1 ? "s" : ""}
               </span>
-            ) : null}
-            {!sc?.emailsMentioned?.length && !sc?.phonesMentioned?.length ? "—" : null}
+            )}
           </div>
         </td>
-        <td className="py-2 px-2 text-foreground align-top break-words" style={{ maxWidth: 90 }}>{location}</td>
-        <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
-          {editingPartnerId === (r.dbId || r.articleUrl) ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="email"
-                autoFocus
-                placeholder="email@company.com"
-                defaultValue={r.matchedPartner?.email || ""}
-                onChange={(e) => setEmailDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleEmailSet(r, emailDraft || (e.target as HTMLInputElement).value);
-                  if (e.key === "Escape") { setEditingPartnerId(null); setEmailDraft(""); }
-                }}
-                className="w-full text-[11px] bg-background border border-border rounded px-1.5 py-0.5 text-foreground min-w-0"
-              />
-              <button
-                onClick={() => handleEmailSet(r, emailDraft)}
-                className="p-0.5 text-primary hover:text-primary/80 shrink-0"
-                title="Save"
-              >
-                <Check className="w-3 h-3" />
-              </button>
-              <button onClick={() => { setEditingPartnerId(null); setEmailDraft(""); }} className="p-0.5 text-muted-foreground hover:text-foreground shrink-0" title="Cancel">
-                <XCircle className="w-3 h-3" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-start gap-1">
-              {r.matchedPartner ? (
-                <a href={`mailto:${r.matchedPartner.email}`} className="text-[11px] text-primary hover:underline break-all">{r.matchedPartner.email}</a>
-              ) : (
-                <span className="text-muted-foreground text-[11px]">—</span>
-              )}
-              <button
-                onClick={() => { setEditingPartnerId(r.dbId || r.articleUrl); setEmailDraft(r.matchedPartner?.email || ""); }}
-                className="p-0.5 text-muted-foreground hover:text-primary shrink-0 mt-0.5"
-                title="Set email"
-              >
-                <Edit2 className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-        </td>
+        
+        {/* Location */}
+        <td className="py-2 px-2 text-foreground align-top break-words text-[11px]" style={{ maxWidth: 90 }}>{location}</td>
+
+        {/* Status */}
         <td className="py-2 px-2 align-top">
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium whitespace-normal leading-tight ${LEAD_STATUS_COLORS[r.status]}`}>{LEAD_STATUS_LABELS[r.status]}</span>
         </td>
+        
+        {/* Actions */}
         <td className="py-2 px-2 text-right align-top">
           <div className="flex flex-wrap items-center gap-0.5 justify-end">
-            {r.status !== "acted_internally" && (
-              <Button variant="ghost" size="sm" disabled className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground opacity-50 cursor-not-allowed">
-                <Briefcase className="w-3 h-3" /> Slack it
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (!r.matchedPartner) {
-                  setEditingPartnerId(r.dbId || r.articleUrl);
-                  toast.info("Enter an email first, then click Email");
-                } else {
-                  handleSendToPartner(r);
-                }
-              }}
-              disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
-              className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary"
-            >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Send email
-            </Button>
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
                 Dup
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRefreshAnalysis(r)}
-              disabled={refreshingFor === r.dbId}
-              className="text-[10px] h-6 px-1.5 gap-1 text-muted-foreground hover:text-primary"
-              title="Refresh analysis"
-            >
-              {refreshingFor === r.dbId ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
+            <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive text-center">
               <Trash2 className="w-3 h-3" />
             </Button>
             <button onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)} className="p-1 text-muted-foreground hover:text-foreground">
@@ -767,7 +869,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             </span>
           )}
         </div>
-        <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} articleSource={r.articleSource} pack={r.pack} />
+        <OpportunityCard 
+          dbId={r.dbId}
+          articleTitle={r.articleTitle} 
+          articleUrl={r.articleUrl} 
+          articleSource={r.articleSource} 
+          pack={r.pack} 
+          onPackUpdate={handlePackUpdate} 
+        />
         <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border bg-muted/20 rounded-b-xl flex-wrap">
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${LEAD_STATUS_COLORS[r.status]}`}>
             {LEAD_STATUS_LABELS[r.status]}
@@ -777,8 +886,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           )}
           <div className="flex items-center gap-1 ml-auto flex-wrap">
             {r.status !== "acted_internally" && (
-              <Button variant="ghost" size="sm" disabled className="text-xs gap-1.5 text-muted-foreground opacity-50 cursor-not-allowed">
-                <Briefcase className="w-3.5 h-3.5" /> Slack it
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleSlackIt(r)}
+                disabled={slackingFor === (r.dbId || r.articleUrl)}
+                className="text-xs gap-1.5 text-muted-foreground hover:text-[#4A154B]"
+              >
+                {slackingFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Briefcase className="w-3.5 h-3.5" />} Slack it
               </Button>
             )}
             <Button
@@ -838,10 +953,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 <th className="py-2 px-2 font-medium">Source Article</th>
                 <th className="py-2 px-2 font-medium">Involved Parties</th>
                 <th className="py-2 px-2 font-medium">Use Case</th>
-                <th className="py-2 px-2 font-medium">PoC</th>
-                <th className="py-2 px-2 font-medium">Contact</th>
+                <th className="py-2 px-2 font-medium">Primary POC</th>
                 <th className="py-2 px-2 font-medium">Location</th>
-                <th className="py-2 px-2 font-medium">Email</th>
                 <th className="py-2 px-2 font-medium">Status</th>
                 <th className="py-2 px-2 font-medium text-right">Actions</th>
               </tr>
@@ -857,7 +970,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             if (!r) return null;
             return (
               <div className="mt-2 mb-4">
-                <OpportunityCard articleTitle={r.articleTitle} articleUrl={r.articleUrl} articleSource={r.articleSource} pack={r.pack} />
+                <OpportunityCard 
+                  dbId={r.dbId}
+                  articleTitle={r.articleTitle} 
+                  articleUrl={r.articleUrl} 
+                  articleSource={r.articleSource} 
+                  pack={r.pack} 
+                  onPackUpdate={handlePackUpdate} 
+                />
               </div>
             );
           })()}

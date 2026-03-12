@@ -63,6 +63,23 @@ export type BuyingIntentType =
   | "REGULATION"
   | "OTHER";
 
+export interface EnrichedContact {
+  personName: string | null;
+  title: string | null;
+  company: string;
+  companyWebsite: string | null;
+  companyDomain: string | null;
+  linkedinUrl: string | null;
+  country: string | null;
+  email: string | null;
+  emailConfidence: "Verified" | "Estimated" | "Not Found";
+  hunterVerified?: boolean | null;
+  source: "article" | "apollo";
+  leadType: "Deployment Lead" | "Technology Partner" | "Potential Customer" | "Government / Regulator" | "Informational / Low Priority";
+  leadPriority: "High" | "Medium" | "Low";
+  notes: string | null;
+}
+
 export interface OpportunityPack {
   companyProfile: {
     companyName: string;
@@ -85,6 +102,7 @@ export interface OpportunityPack {
     opportunityScore: number;
   };
   crmReadyNotes: string;
+  enrichedContacts?: EnrichedContact[];
 }
 
 export interface CollectionRunSummary {

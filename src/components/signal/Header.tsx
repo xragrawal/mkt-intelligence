@@ -22,15 +22,15 @@ export function Header() {
         </Link>
         <nav className="flex items-center gap-6">
           <Link
-            to="/partners"
+            to="/enrich-test"
             className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-              location.pathname === "/partners"
+              location.pathname === "/enrich-test"
                 ? "text-primary"
                 : "text-foreground hover:text-primary"
             }`}
           >
             <Users className="w-4 h-4" />
-            Partners
+            Test Enrich Agent
           </Link>
           <Link
             to="/trends"
