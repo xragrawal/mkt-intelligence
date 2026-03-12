@@ -37,6 +37,13 @@ serve(async (req) => {
       whyThisIsHot, strategicEntryPoint, useCaseCategory,
     } = body;
 
+    if (!opportunityPackId) {
+      return new Response(
+        JSON.stringify({ error: "opportunityPackId is required to create a pending email approval" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (!partnerEmail || !companyName) {
       return new Response(
         JSON.stringify({ error: "partnerEmail and companyName are required" }),

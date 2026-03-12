@@ -623,7 +623,7 @@ serve(async (req) => {
 
         const apolloContacts: EnrichedContact[] = [];
         const uniqueCompanies = [...new Set(articleContacts.map(c => c.company))].filter(
-          n => !n.toLowerCase().includes("dji")
+          (n) => n && !n.toLowerCase().includes("dji")
         );
 
         await Promise.allSettled(
