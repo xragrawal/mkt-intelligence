@@ -141,6 +141,8 @@ export interface PipelineBreakdown {
   droppedByCap: number;
   crossBatchDupes: number;
   newArticles: number;
+  /** Optional: number of items that were previously seen (scored or deep-dived) and intentionally skipped during re-association (used by LinkedIn collector). */
+  visitedAndSkipped?: number;
 }
 
 export type LeadStatus = "open" | "shared_with_partners" | "acted_internally" | "closed" | "archived" | "duplicate" | "deleted";

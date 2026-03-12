@@ -65,6 +65,11 @@ function generatePostId(post: LinkedInContentPost, keyword: string): string {
   return crypto.createHash("sha256").update(idSource).digest("hex").slice(0, 16);
 }
 
+function canonicalizeUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  return String(url).trim().split("?")[0];
+}
+
 /**
  * Remove problematic Unicode characters that cause JSON serialization errors.
  * Particularly targets emoji and other high Unicode characters that break PostgreSQL.
@@ -83,14 +88,14 @@ function sanitizeText(text: string): string {
 }
 
 /**
- * Truncate text to create a title-like snippet from LinkedIn post content.
+ * Use the full LinkedIn post content as the "title" we send downstream.
+ * We still sanitize and collapse whitespace, but do not truncate — this allows
+ * Step 2 / LLM scoring to see the entire text of the post.
  */
-function createTitle(postContent: string, maxLength = 150): string {
+function createTitle(postContent: string): string {
   if (!postContent) return "(LinkedIn post)";
   const sanitized = sanitizeText(postContent);
-  const cleaned = sanitized.replace(/\s+/g, " ").trim();
-  if (cleaned.length <= maxLength) return cleaned;
-  return cleaned.slice(0, maxLength).trim() + "...";
+  return sanitized.replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -206,11 +211,12 @@ app.post("/api/collect-linkedin", async (req, res) => {
       `[LinkedIn Server] Total posts scraped: ${totalCollected}`
     );
 
-    // Basic deduplication by post URL
+    // Basic deduplication by post URL (canonicalized)
     const seenUrls = new Set<string>();
     const deduped = allPosts.filter((p) => {
-      if (!p.postUrl || seenUrls.has(p.postUrl)) return false;
-      seenUrls.add(p.postUrl);
+      const url = canonicalizeUrl(p.postUrl);
+      if (!url || seenUrls.has(url)) return false;
+      seenUrls.add(url);
       return true;
     });
     const afterDedup = deduped.length;
@@ -228,11 +234,12 @@ app.post("/api/collect-linkedin", async (req, res) => {
     const MAX_ARTICLES = 50;
     const toStore = filtered.slice(0, MAX_ARTICLES);
 
-    // Transform to collected_articles format
+    // Transform to collected_articles candidate rows
     const rows = toStore.map((post) => ({
       id: generatePostId(post, post.keyword),
       keyword: post.keyword,
-      url: post.postUrl,
+      // Store canonical URL so repeats across runs match reliably
+      url: canonicalizeUrl(post.postUrl),
       title: createTitle(post.postContent),
       snippet: sanitizeText(post.postContent).slice(0, 500) || null,
       publishing_agency: post.authorName || null,
@@ -241,42 +248,185 @@ app.post("/api/collect-linkedin", async (req, res) => {
       source: "linkedin",
     }));
 
-    // Cross-batch dedup: check DB for existing articles
+    // Cross-batch logic + re-association (Gate 1 equivalent for LinkedIn)
+    // - New articles: inserted with current batch_id
+    // - Existing, never-seen articles: re-associated to this batch
+    // - Existing, already seen (scored or deep-dived): skipped entirely
     let newArticlesCount = 0;
     let crossBatchDupes = 0;
+    let visitedAndSkipped = 0;
 
-    console.log(`[LinkedIn Server] Processing ${rows.length} rows for storage...`);
+    console.log(`[LinkedIn Server] Processing ${rows.length} rows for storage with cross-batch checks...`);
+    let responseArticles: Array<{
+      id: string;
+      title: string;
+      url: string;
+      keyword: string;
+      publishing_agency: string | null;
+      published_at: string | null;
+      source: "linkedin";
+    }> = [];
 
     if (rows.length > 0) {
-      // Insert all articles (they'll be new from LinkedIn)
-      const { data: insertedData, error: insertError } = await supabase
-        .from("collected_articles")
-        .upsert(rows, { onConflict: "id" });
+      const candidateIds = rows.map((r) => r.id);
+      const candidateUrls = rows.map((r) => canonicalizeUrl(r.url)).filter((u): u is string => !!u);
 
-      if (insertError) {
-        console.error("[LinkedIn Server] Insert error:", insertError);
-        throw new Error(`Failed to insert articles: ${insertError.message}`);
+      // Existing collected articles for these ids/URLs
+      const { data: existingArticles, error: existingErr } = await supabase
+        .from("collected_articles")
+        .select("id, url, batch_id, original_batch_id")
+        .in("id", candidateIds);
+
+      if (existingErr) {
+        console.error("[LinkedIn Server] Error fetching existing collected_articles:", existingErr);
+        throw new Error(`Failed to check existing LinkedIn articles: ${existingErr.message}`);
       }
+
+      const existingById = new Map<string, { id: string; url: string; batch_id: string | null; original_batch_id: string | null }>();
+      (existingArticles || []).forEach((row) => {
+        existingById.set(row.id, row as any);
+      });
+
+      // Also match by URL because historical IDs included keyword (so reruns can create new IDs for same post)
+      const { data: existingByUrlRows, error: existingByUrlErr } = await supabase
+        .from("collected_articles")
+        .select("id, url, batch_id, original_batch_id")
+        .in("url", candidateUrls);
+
+      if (existingByUrlErr) {
+        console.error("[LinkedIn Server] Error fetching existing collected_articles by URL:", existingByUrlErr);
+        throw new Error(`Failed to check existing LinkedIn URLs: ${existingByUrlErr.message}`);
+      }
+
+      const existingByUrl = new Map<string, { id: string; url: string; batch_id: string | null; original_batch_id: string | null }>();
+      (existingByUrlRows || []).forEach((row) => {
+        const key = canonicalizeUrl(row.url);
+        if (key) existingByUrl.set(key, row as any);
+      });
+
+      // Check if articles have ever been scored (Step 2) or deep-dived (Step 3)
+      const { data: scoredRows, error: scoredErr } = await supabase
+        .from("scored_articles")
+        .select("article_id")
+        .in("article_id", candidateIds);
+
+      if (scoredErr) {
+        console.error("[LinkedIn Server] Error checking scored_articles:", scoredErr);
+        throw new Error(`Failed to check scored LinkedIn articles: ${scoredErr.message}`);
+      }
+
+      const { data: oppPacks, error: packsErr } = await supabase
+        .from("opportunity_packs")
+        .select("article_url")
+        .in("article_url", candidateUrls);
+
+      if (packsErr) {
+        console.error("[LinkedIn Server] Error checking opportunity_packs:", packsErr);
+        throw new Error(`Failed to check LinkedIn opportunity packs: ${packsErr.message}`);
+      }
+
+      const seenArticleIds = new Set<string>((scoredRows || []).map((r) => r.article_id));
+      const seenArticleUrls = new Set<string>((oppPacks || []).map((p) => canonicalizeUrl(p.article_url)));
+
+      const newArticles: typeof rows = [];
+      const toReassociateIds: string[] = [];
+      const storedForScoring: typeof rows = [];
+
+      for (const row of rows) {
+        const key = canonicalizeUrl(row.url);
+        const existing = existingById.get(row.id) || (key ? existingByUrl.get(key) : undefined);
+
+        if (!existing) {
+          // Completely new article
+          newArticles.push(row);
+          storedForScoring.push(row);
+          continue;
+        }
+
+        // If we've ever "seen" this article before (scored or deep-dived), skip it entirely
+        if (seenArticleIds.has(existing.id) || (key && seenArticleUrls.has(key))) {
+          visitedAndSkipped += 1;
+          continue;
+        }
+
+        // Existing in collected_articles but never surfaced to user → re-associate
+        toReassociateIds.push(existing.id);
+        storedForScoring.push({ ...row, id: existing.id });
+      }
+
+      newArticlesCount = newArticles.length;
+      crossBatchDupes = rows.length - newArticles.length;
 
       console.log(
-        `[LinkedIn Server] Successfully inserted ${rows.length} articles`
+        `[LinkedIn Server] Cross-batch summary: ${newArticlesCount} new, ${toReassociateIds.length} re-associated, ${visitedAndSkipped} previously seen + skipped`
       );
 
-      // Check what was actually inserted
-      const { data: checkData, error: checkError } = await supabase
-        .from("collected_articles")
-        .select("id, batch_id")
-        .eq("batch_id", batchId);
+      if (newArticles.length > 0) {
+        const { error: insertError } = await supabase
+          .from("collected_articles")
+          .upsert(
+            newArticles.map((a) => ({
+              id: a.id,
+              keyword: a.keyword,
+              url: a.url,
+              title: a.title,
+              snippet: a.snippet,
+              publishing_agency: a.publishing_agency,
+              published_at: a.published_at,
+              batch_id: batchId,
+              source: "linkedin",
+            })),
+            { onConflict: "id" }
+          );
 
-      if (!checkError) {
-        console.log(
-          `[LinkedIn Server] Verified: ${checkData?.length || 0} articles in DB with batch_id ${batchId}`
-        );
-        newArticlesCount = checkData?.length || 0;
+        if (insertError) {
+          console.error("[LinkedIn Server] Insert error:", insertError);
+          throw new Error(`Failed to insert LinkedIn articles: ${insertError.message}`);
+        }
       }
+
+      // Re-associate existing-but-never-seen articles to current batch
+      if (toReassociateIds.length > 0) {
+        const { data: existingRows } = await supabase
+          .from("collected_articles")
+          .select("id, batch_id, original_batch_id")
+          .in("id", toReassociateIds);
+
+        if (existingRows && existingRows.length > 0) {
+          for (const row of existingRows) {
+            if (!row.original_batch_id) {
+              await supabase
+                .from("collected_articles")
+                .update({ original_batch_id: row.batch_id })
+                .eq("id", row.id);
+            }
+          }
+        }
+
+        const { error: updateError } = await supabase
+          .from("collected_articles")
+          .update({ batch_id: batchId })
+          .in("id", toReassociateIds);
+
+        if (updateError) {
+          console.error("[LinkedIn Server] Re-associate error:", updateError);
+          throw new Error(`Failed to re-associate LinkedIn articles: ${updateError.message}`);
+        }
+      }
+
+      // Make Step 1 UI only show what actually flows forward (new + re-associated)
+      responseArticles = storedForScoring.map((r) => ({
+        id: r.id,
+        title: r.title,
+        url: r.url,
+        keyword: r.keyword,
+        publishing_agency: r.publishing_agency,
+        published_at: r.published_at,
+        source: "linkedin" as const,
+      }));
     } else {
       console.warn(
-        `[LinkedIn Server] WARNING: No rows to insert! toStore.length=${toStore.length}, rows.length=${rows.length}`
+        `[LinkedIn Server] WARNING: No rows to process! toStore.length=${toStore.length}, rows.length=${rows.length}`
       );
     }
 
@@ -289,7 +439,8 @@ app.post("/api/collect-linkedin", async (req, res) => {
       .from("collection_runs")
       .update({
         articles_collected: totalCollected,
-        articles_stored: toStore.length,
+        // Only count new + re-associated articles as "stored for scoring"
+        articles_stored: newArticlesCount + (toStore.length - newArticlesCount - visitedAndSkipped),
         completed_at: new Date().toISOString(),
         status: "completed",
       })
@@ -308,7 +459,7 @@ app.post("/api/collect-linkedin", async (req, res) => {
         id: batchId,
         keywords,
         articles_collected: totalCollected,
-        articles_stored: toStore.length,
+        articles_stored: newArticlesCount + (toStore.length - newArticlesCount - visitedAndSkipped),
         after_dedup: afterDedup,
         after_date_filter: afterDateFilter,
         duplicates_removed: dedupRemoved,
@@ -319,19 +470,12 @@ app.post("/api/collect-linkedin", async (req, res) => {
         completed_at: new Date().toISOString(),
         status: "completed",
       },
-      articles: rows.map((r) => ({
-        id: r.id,
-        title: r.title,
-        url: r.url,
-        keyword: r.keyword,
-        publishing_agency: r.publishing_agency,
-        published_at: r.published_at,
-        source: "linkedin" as const,
-      })),
+      // new + re-associated only (excludes previously seen/skipped)
+      articles: responseArticles,
       allFetched: allPosts.map((p) => ({
         id: generatePostId(p, p.keyword),
         title: createTitle(p.postContent),
-        url: p.postUrl,
+        url: canonicalizeUrl(p.postUrl),
         keyword: p.keyword,
         publishing_agency: p.authorName,
         published_at: p.publishedAt,
@@ -341,12 +485,13 @@ app.post("/api/collect-linkedin", async (req, res) => {
         totalFetched: totalCollected,
         afterDedup,
         afterDateFilter,
-        afterCap: toStore.length,
+        afterCap: newArticlesCount + (toStore.length - newArticlesCount - visitedAndSkipped),
         droppedByDedup: dedupRemoved,
         droppedByDateFilter: 0,
         droppedByCap: Math.max(0, afterDateFilter - MAX_ARTICLES),
         crossBatchDupes,
         newArticles: newArticlesCount,
+        visitedAndSkipped,
       },
       lastRunForKeywords: null,
     };

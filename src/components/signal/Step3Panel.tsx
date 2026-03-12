@@ -104,6 +104,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   const [editingPocId, setEditingPocId] = useState<string | null>(null);
   const [pocDraft, setPocDraft] = useState<string>("");
   const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
+  const [showCurrentRunSection, setShowCurrentRunSection] = useState(true);
+  const [showPreviousRunsSection, setShowPreviousRunsSection] = useState(true);
   const [batchesInitialized, setBatchesInitialized] = useState(false);
   const { provider } = useLLMProvider();
 
@@ -1083,68 +1085,176 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
       {/* BATCH-GROUPED RESULTS */}
       {batchGroups.length > 0 && (
         <div className="space-y-3">
-          {batchGroups.map((batch) => {
-            const isExpanded = expandedBatches.has(batch.batchId);
-            return (
-              <div
-                key={batch.batchId}
-                className={`border rounded-lg overflow-hidden transition-colors ${
-                  batch.isCurrentBatch
-                    ? "bg-primary/5 border-primary/30"
-                    : "border-border"
-                }`}
+          {/* Current run section */}
+          {batchGroups.some((b) => b.isCurrentBatch) && (
+            <div className="border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setShowCurrentRunSection((prev) => !prev)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-left bg-muted/40 hover:bg-muted/60 transition-colors"
               >
-                {/* Batch Header */}
-                <button
-                  onClick={() => toggleBatch(batch.batchId)}
-                  className="w-full text-left p-3 flex items-center gap-3 hover:bg-muted/30 transition-colors"
-                >
-                  <div className={`transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <div className={`transition-transform duration-200 ${showCurrentRunSection ? "rotate-90" : ""}`}>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm text-foreground">{batch.label}</span>
-                      <span className="text-xs text-muted-foreground">({batch.articles.length} {batch.articles.length === 1 ? "article" : "articles"})</span>
-                      {batch.isCurrentBatch && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-medium dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
-                          NEW ADDITIONS
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      {batch.keywords.length > 0 && (
-                        <span className="text-[11px] text-muted-foreground">
-                          Keywords: {batch.keywords.join(", ")}
-                        </span>
-                      )}
-                      {batch.region && (
-                        <span className="text-[11px] text-muted-foreground">
-                          | Region: {batch.region}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {/* Status pills */}
-                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                    {Object.entries(batch.statusBreakdown)
-                      .filter(([, v]) => (v as number) > 0)
-                      .map(([status, count]) => (
-                        <span
-                          key={status}
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${LEAD_STATUS_COLORS[status as LeadStatus]}`}
+                  <span className="text-sm font-semibold text-foreground">Current run leads</span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {batchGroups
+                    .filter((b) => b.isCurrentBatch)
+                    .reduce((sum, b) => sum + b.articles.length, 0)}{" "}
+                  leads
+                </span>
+              </button>
+              {showCurrentRunSection && (
+                <div className="space-y-3 p-3 pt-2">
+                  {batchGroups
+                    .filter((batch) => batch.isCurrentBatch)
+                    .map((batch) => {
+                      const isExpanded = expandedBatches.has(batch.batchId);
+                      return (
+                        <div
+                          key={batch.batchId}
+                          className="border rounded-lg overflow-hidden transition-colors bg-primary/5 border-primary/30"
                         >
-                          {count} {LEAD_STATUS_LABELS[status as LeadStatus]}
-                        </span>
-                      ))}
-                  </div>
-                </button>
+                          {/* Batch Header */}
+                          <button
+                            onClick={() => toggleBatch(batch.batchId)}
+                            className="w-full text-left p-3 flex items-center gap-3 hover:bg-muted/30 transition-colors"
+                          >
+                            <div className={`transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-sm text-foreground">{batch.label}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({batch.articles.length} {batch.articles.length === 1 ? "article" : "articles"})
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-medium dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                                  NEW ADDITIONS
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {batch.keywords.length > 0 && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Keywords: {batch.keywords.join(", ")}
+                                  </span>
+                                )}
+                                {batch.region && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    | Region: {batch.region}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Status pills */}
+                            <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                              {Object.entries(batch.statusBreakdown)
+                                .filter(([, v]) => (v as number) > 0)
+                                .map(([status, count]) => (
+                                  <span
+                                    key={status}
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${LEAD_STATUS_COLORS[status as LeadStatus]}`}
+                                  >
+                                    {count} {LEAD_STATUS_LABELS[status as LeadStatus]}
+                                  </span>
+                                ))}
+                            </div>
+                          </button>
 
-                {/* Batch Articles */}
-                {renderBatchArticles(batch)}
-              </div>
-            );
-          })}
+                          {/* Batch Articles */}
+                          {renderBatchArticles(batch)}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Previous runs section */}
+          {batchGroups.some((b) => !b.isCurrentBatch) && (
+            <div className="border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setShowPreviousRunsSection((prev) => !prev)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-left bg-muted/40 hover:bg-muted/60 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`transition-transform duration-200 ${showPreviousRunsSection ? "rotate-90" : ""}`}>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">Previous runs leads</span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {batchGroups
+                    .filter((b) => !b.isCurrentBatch)
+                    .reduce((sum, b) => sum + b.articles.length, 0)}{" "}
+                  leads
+                </span>
+              </button>
+              {showPreviousRunsSection && (
+                <div className="space-y-3 p-3 pt-2">
+                  {batchGroups
+                    .filter((batch) => !batch.isCurrentBatch)
+                    .map((batch) => {
+                      const isExpanded = expandedBatches.has(batch.batchId);
+                      return (
+                        <div
+                          key={batch.batchId}
+                          className="border rounded-lg overflow-hidden transition-colors border-border bg-card"
+                        >
+                          {/* Batch Header */}
+                          <button
+                            onClick={() => toggleBatch(batch.batchId)}
+                            className="w-full text-left p-3 flex items-center gap-3 hover:bg-muted/30 transition-colors"
+                          >
+                            <div className={`transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-sm text-foreground">{batch.label}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  ({batch.articles.length} {batch.articles.length === 1 ? "article" : "articles"})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {batch.keywords.length > 0 && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Keywords: {batch.keywords.join(", ")}
+                                  </span>
+                                )}
+                                {batch.region && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    | Region: {batch.region}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Status pills */}
+                            <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                              {Object.entries(batch.statusBreakdown)
+                                .filter(([, v]) => (v as number) > 0)
+                                .map(([status, count]) => (
+                                  <span
+                                    key={status}
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${LEAD_STATUS_COLORS[status as LeadStatus]}`}
+                                  >
+                                    {count} {LEAD_STATUS_LABELS[status as LeadStatus]}
+                                  </span>
+                                ))}
+                            </div>
+                          </button>
+
+                          {/* Batch Articles */}
+                          {renderBatchArticles(batch)}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

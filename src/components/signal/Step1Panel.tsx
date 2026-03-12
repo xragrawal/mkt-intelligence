@@ -503,18 +503,38 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
               {pipeline.droppedByCap > 0 && (
                 <PipelineArrow dropped={pipeline.droppedByCap} reason={`capped at ${MAX_ARTICLES_STORED}`} />
               )}
+              {pipeline.visitedAndSkipped ? (
+                <PipelineArrow dropped={pipeline.visitedAndSkipped} reason="previously seen (already scored / deep-dived) — skipped" />
+              ) : null}
               <PipelineRow label="Stored for scoring" value={pipeline.afterCap} variant="highlight" />
               {pipeline.crossBatchDupes > 0 && (
                 <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground w-48">Already in DB (prev batches)</span>
-                    <span className="text-signal-funding font-medium tabular-nums">{pipeline.crossBatchDupes}</span>
-                    <span className="text-muted-foreground/60">re-associated</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground w-48">New articles inserted</span>
-                    <span className="text-primary font-bold tabular-nums">{pipeline.newArticles}</span>
-                  </div>
+                  {(() => {
+                    const visited = pipeline.visitedAndSkipped || 0;
+                    const reAssociated = Math.max(pipeline.crossBatchDupes - visited, 0);
+                    return (
+                      <>
+                        {reAssociated > 0 && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground w-48">Already in DB (prev batches)</span>
+                            <span className="text-signal-funding font-medium tabular-nums">{reAssociated}</span>
+                            <span className="text-muted-foreground/60">re-associated into this batch</span>
+                          </div>
+                        )}
+                        {visited > 0 && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground w-48">Previously seen &amp; skipped</span>
+                            <span className="text-muted-foreground font-medium tabular-nums">{visited}</span>
+                            <span className="text-muted-foreground/60">already scored or deep-dived</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground w-48">New articles inserted</span>
+                          <span className="text-primary font-bold tabular-nums">{pipeline.newArticles}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
