@@ -23,6 +23,8 @@ export function Header() {
         <nav className="flex items-center gap-6">
           <Link
             to="/enrich-test"
+            target="_blank"
+            rel="noopener noreferrer"
             className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
               location.pathname === "/enrich-test"
                 ? "text-primary"

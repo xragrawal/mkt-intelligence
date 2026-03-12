@@ -14,7 +14,7 @@ import { toast } from "sonner";
 const AVAILABLE_SOURCES = {
   google_news: { id: "google_news", label: "Google News", icon: Newspaper },
   linkedin: { id: "linkedin", label: "LinkedIn", icon: Linkedin },
-  facebook: { id: "facebook", label: "Facebook", icon: Facebook },
+  facebook: { id: "facebook", label: "Facebook (Coming soon)", icon: Facebook },
 } as const;
 
 type SourceId = keyof typeof AVAILABLE_SOURCES;
@@ -317,6 +317,7 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
                 <Checkbox
                   checked={selectedSources.includes(sourceId)}
                   onCheckedChange={() => toggleSource(sourceId)}
+                  disabled={sourceId === "facebook"}
                   className="w-5 h-5"
                 />
                 <IconComponent className="w-4 h-4 text-primary shrink-0" />
@@ -351,7 +352,7 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
         {useGoogleNews && (
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-muted-foreground" />
-            <label className="text-sm text-muted-foreground">News Editions</label>
+            <label className="text-sm text-muted-foreground">Region</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 text-sm bg-muted border-border min-w-[140px] justify-start">
@@ -416,25 +417,9 @@ export function Step1Panel({ onRunComplete, lastRun, selectedRegions, onRegionsC
                 </div>
               </PopoverContent>
             </Popover>
-            <span className="text-[10px] text-muted-foreground/70 inline-flex items-center gap-0.5" title="Region controls which Google News edition is queried, not the article's subject location. An article from Germany's edition may cover events in other countries.">
-              <Info className="w-3 h-3" /> Edition = source, not topic location
-            </span>
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-muted-foreground" />
-          <label className="text-sm text-muted-foreground">AI Model</label>
-          <select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as LLMProvider)}
-            className="bg-muted border border-border rounded-md px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            {LLM_OPTIONS.map((opt) => (
-              <option key={opt.id} value={opt.id}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
 
         {useLinkedIn && (
           <span className="text-[10px] text-muted-foreground/70 inline-flex items-center gap-1">

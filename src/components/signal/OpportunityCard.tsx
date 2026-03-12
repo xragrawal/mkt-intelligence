@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Copy, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Mail, Briefcase, Edit2, Check, XCircle, Loader2 } from "lucide-react";
+import { Copy, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Mail, Briefcase, Edit2, Check, XCircle, Loader2, Newspaper, Linkedin, Facebook } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { OpportunityPack, EnrichedContact } from "@/lib/types";
 import { SOURCE_LABELS, SOURCE_COLORS } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { DraftEmailModal } from "./DraftEmailModal";
 
 interface OpportunityCardProps {
   dbId?: string;
@@ -14,6 +15,8 @@ interface OpportunityCardProps {
   articleSource?: string | null;
   pack: OpportunityPack;
   onPackUpdate?: (dbId: string, pack: OpportunityPack) => void;
+  onSlackIt?: (contact: EnrichedContact) => void;
+  onSendEmail?: (contact: EnrichedContact) => void;
 }
 
 const urgencyColor: Record<string, string> = {
@@ -28,7 +31,7 @@ const maturityBadge: Record<string, string> = {
   ENTERPRISE_GRADE: "bg-signal-contract/15 text-signal-contract",
 };
 
-export function OpportunityCard({ dbId, articleTitle, articleUrl, articleSource, pack, onPackUpdate }: OpportunityCardProps) {
+export function OpportunityCard({ dbId, articleTitle, articleUrl, articleSource, pack, onPackUpdate, onSlackIt, onSendEmail }: OpportunityCardProps) {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     profile: true,
     contacts: true,
@@ -58,9 +61,14 @@ export function OpportunityCard({ dbId, articleTitle, articleUrl, articleSource,
           </h3>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {articleSource && (
-              <Badge variant="outline" className={`text-xs px-2 py-0.5 border ${SOURCE_COLORS[articleSource as keyof typeof SOURCE_COLORS] || ""}`}>
-                {SOURCE_LABELS[articleSource as keyof typeof SOURCE_LABELS] || articleSource}
-              </Badge>
+              <div className="flex">
+                {articleSource === "google_news" && <span title="Google News" className="shrink-0 flex"><Newspaper className="w-3.5 h-3.5 text-muted-foreground" /></span>}
+                {articleSource === "linkedin" && <span title="LinkedIn" className="shrink-0 flex"><Linkedin className="w-3.5 h-3.5 text-[#0A66C2]" /></span>}
+                {articleSource === "facebook" && <span title="Facebook" className="shrink-0 flex"><Facebook className="w-3.5 h-3.5 text-[#1877F2]" /></span>}
+                {!["google_news", "linkedin", "facebook"].includes(articleSource || "") && articleSource && (
+                  <span className="text-[10px] text-muted-foreground font-medium">{SOURCE_LABELS[articleSource as keyof typeof SOURCE_LABELS] || articleSource}</span>
+                )}
+              </div>
             )}
             <a
               href={articleUrl}
@@ -120,6 +128,10 @@ export function OpportunityCard({ dbId, articleTitle, articleUrl, articleSource,
           dbId={dbId} 
           pack={pack} 
           onPackUpdate={onPackUpdate} 
+          onSlackIt={onSlackIt}
+          onSendEmail={onSendEmail}
+          articleTitle={articleTitle}
+          articleUrl={articleUrl}
         />
       </CollapsibleSection>
 
@@ -169,7 +181,7 @@ export function OpportunityCard({ dbId, articleTitle, articleUrl, articleSource,
   );
 }
 
-function ContactsList({ contacts, dbId, pack, onPackUpdate }: { contacts: EnrichedContact[], dbId?: string, pack: OpportunityPack, onPackUpdate?: (dbId: string, pack: OpportunityPack) => void }) {
+function ContactsList({ contacts, dbId, pack, onPackUpdate, onSlackIt, onSendEmail, articleTitle, articleUrl }: { contacts: EnrichedContact[], dbId?: string, pack: OpportunityPack, onPackUpdate?: (dbId: string, pack: OpportunityPack) => void, onSlackIt?: (contact: EnrichedContact) => void, onSendEmail?: (contact: EnrichedContact) => void, articleTitle: string, articleUrl: string }) {
   if (!contacts || contacts.length === 0) return <p className="text-sm text-muted-foreground">No contacts discovered.</p>;
 
   // Group by company
@@ -193,6 +205,8 @@ function ContactsList({ contacts, dbId, pack, onPackUpdate }: { contacts: Enrich
     onPackUpdate(dbId, newPack);
   };
 
+  const [draftContact, setDraftContact] = useState<EnrichedContact | null>(null);
+
   return (
     <div className="space-y-6">
       {Object.entries(grouped).map(([company, compContacts]) => (
@@ -207,16 +221,32 @@ function ContactsList({ contacts, dbId, pack, onPackUpdate }: { contacts: Enrich
           </div>
           <div className="space-y-2">
             {compContacts.map((c, idx) => (
-              <ContactRow key={idx} contact={c} onUpdate={handleContactUpdate} />
+              <ContactRow 
+                key={idx} 
+                contact={c} 
+                onUpdate={handleContactUpdate} 
+                onSlackIt={() => onSlackIt?.(c)}
+                onDraftEmail={() => onSendEmail?.(c)} 
+              />
             ))}
           </div>
         </div>
       ))}
+      {draftContact && (
+        <DraftEmailModal 
+          isOpen={!!draftContact} 
+          onClose={() => setDraftContact(null)} 
+          contact={draftContact} 
+          pack={pack} 
+          articleTitle={articleTitle} 
+          articleUrl={articleUrl} 
+        />
+      )}
     </div>
   );
 }
 
-function ContactRow({ contact, onUpdate }: { contact: EnrichedContact, onUpdate: (c: EnrichedContact) => void }) {
+function ContactRow({ contact, onUpdate, onSlackIt, onDraftEmail }: { contact: EnrichedContact, onUpdate: (c: EnrichedContact) => void, onSlackIt?: () => void, onDraftEmail: () => void }) {
   const [isEditing, setIsEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState(contact.personName || "");
   const [titleDraft, setTitleDraft] = useState(contact.title || "");
@@ -326,7 +356,19 @@ function ContactRow({ contact, onUpdate }: { contact: EnrichedContact, onUpdate:
       
       {!isEditing && (
         <div className="flex items-center gap-1 shrink-0">
-          <Button variant="outline" size="sm" className="h-7 text-xs px-2 gap-1.5 text-muted-foreground hover:text-[#4A154B]">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 text-xs px-2 gap-1.5 text-muted-foreground hover:text-[#4A154B]"
+            disabled={isInvalidEmail || !contact.email}
+            onClick={() => {
+              if (isInvalidEmail || !contact.email) {
+                toast.error("Valid email required");
+              } else {
+                onSlackIt?.();
+              }
+            }}
+          >
             <Briefcase className="w-3 h-3" /> Slack it
           </Button>
           <Button 
@@ -338,8 +380,7 @@ function ContactRow({ contact, onUpdate }: { contact: EnrichedContact, onUpdate:
               if (isInvalidEmail || !contact.email) {
                 toast.error("Valid email required");
               } else {
-                toast.info(`Opening Draft Review Modal for ${contact.personName}`);
-                // Real logic to open modal would go here
+                onDraftEmail();
               }
             }}
           >

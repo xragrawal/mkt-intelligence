@@ -9,8 +9,17 @@ verify_jwt = false
 [functions.deep-dive]
 verify_jwt = false
 
-[functions.collect-linkedin]
+[functions.send-partner-email]
 verify_jwt = false
 
-[functions.send-partner-email]
+[functions.enrich-contacts-test]
+verify_jwt = false
+
+[functions.slack-approval-request]
+verify_jwt = false
+
+[functions.slack-interaction]
+verify_jwt = false
+
+[functions.verify-email]
 verify_jwt = false

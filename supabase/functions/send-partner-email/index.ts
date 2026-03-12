@@ -98,6 +98,25 @@ function buildOpportunityParagraph(
   return parts.join(" ") || "I think there may be a natural overlap worth a short conversation.";
 }
 
+// Convert plain text email body to simple HTML for sending
+function textToHtml(text: string): string {
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const paragraphs = escaped
+    .split(/\n\n+/)
+    .map((p) => `<p style="margin: 0 0 20px 0;">${p.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.75; color: #1a1a1a; max-width: 580px; margin: 0 auto; padding: 40px 24px; background: #ffffff;">
+${paragraphs}
+</body>
+</html>`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -118,6 +137,8 @@ serve(async (req) => {
       articleUrl,
       whyThisIsHot,
       strategicEntryPoint,
+      customSubject,
+      customTextBody,
     } = await req.json();
 
     if (!partnerEmail || !companyName) {
@@ -146,34 +167,41 @@ serve(async (req) => {
 
     // ── Assemble content ─────────────────────────────────────────────────────
 
-    const subject = `Re: ${articleTitle || `${companyName} — drone operations`}`;
+    const subject = customSubject || `Re: ${articleTitle || `${companyName} — drone operations`}`;
 
-    const recipientName = pocName || partnerName || "there";
+    let htmlBody;
+    let textBody;
 
-    // Para 1 — article hook
-    const eventDescription = eventType
-      ? eventType.replace(/_/g, " ").toLowerCase()
-      : "recent work";
-    const locationContext = country
-      ? ` in ${country}`
-      : deploymentRegion ? ` in ${deploymentRegion}` : "";
-    const p1 = `Came across "${articleTitle || "the recent piece"}" — ${companyName}'s ${eventDescription}${locationContext} caught my attention.`;
+    if (customTextBody) {
+      textBody = customTextBody;
+      htmlBody = textToHtml(customTextBody);
+    } else {
+      const recipientName = pocName || partnerName || "there";
 
-    // Para 2 — intro + name-drop
-    const flytbaseIntro = buildFlytbaseIntro(inferredIndustry, eventType);
-    const nameDrop      = buildNameDrop(inferredIndustry, deploymentRegion, country);
-    const p2 = `I'm Ravikant from the Business Development team at FlytBase. ${flytbaseIntro} ${nameDrop}`;
+      // Para 1 — article hook
+      const eventDescription = eventType
+        ? eventType.replace(/_/g, " ").toLowerCase()
+        : "recent work";
+      const locationContext = country
+        ? ` in ${country}`
+        : deploymentRegion ? ` in ${deploymentRegion}` : "";
+      const p1 = `Came across "${articleTitle || "the recent piece"}" — ${companyName}'s ${eventDescription}${locationContext} caught my attention.`;
 
-    // Para 3 — opportunity / the gap
-    const p3 = buildOpportunityParagraph(whyThisIsHot, strategicEntryPoint, unitsMentioned ?? null, deploymentRegion);
+      // Para 2 — intro + name-drop
+      const flytbaseIntro = buildFlytbaseIntro(inferredIndustry, eventType);
+      const nameDrop      = buildNameDrop(inferredIndustry, deploymentRegion, country);
+      const p2 = `I'm Ravikant from the Business Development team at FlytBase. ${flytbaseIntro} ${nameDrop}`;
 
-    // Para 4 — CTA
-    const industryCtx = inferredIndustry || "this space";
-    const regionCtx   = deploymentRegion || country || "the region";
-    const p4 = `Would a short call make sense? Happy to share what we've seen work for teams in ${industryCtx} across ${regionCtx}.`;
+      // Para 3 — opportunity / the gap
+      const p3 = buildOpportunityParagraph(whyThisIsHot, strategicEntryPoint, unitsMentioned ?? null, deploymentRegion);
 
-    // ── HTML — plain prose, no boxes or tables ───────────────────────────────
-    const htmlBody = `<!DOCTYPE html>
+      // Para 4 — CTA
+      const industryCtx = inferredIndustry || "this space";
+      const regionCtx   = deploymentRegion || country || "the region";
+      const p4 = `Would a short call make sense? Happy to share what we've seen work for teams in ${industryCtx} across ${regionCtx}.`;
+
+      // ── HTML — plain prose, no boxes or tables ───────────────────────────────
+      htmlBody = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.75; color: #1a1a1a; max-width: 580px; margin: 0 auto; padding: 40px 24px; background: #ffffff;">
@@ -199,21 +227,22 @@ serve(async (req) => {
 </body>
 </html>`;
 
-    // Plain-text fallback
-    const textBody = [
-      `Hi ${recipientName},`,
-      "", p1,
-      "", p2,
-      "", p3,
-      "", p4,
-      "",
-      "Thanks,",
-      "Ravikant Agrawal",
-      "Business Development, FlytBase",
-      "ravikant.agrawal@flytbase.com",
-      "",
-      `Article reference: ${articleUrl || ""}`,
-    ].join("\n");
+      // Plain-text fallback
+      textBody = [
+        `Hi ${recipientName},`,
+        "", p1,
+        "", p2,
+        "", p3,
+        "", p4,
+        "",
+        "Thanks,",
+        "Ravikant Agrawal",
+        "Business Development, FlytBase",
+        "ravikant.agrawal@flytbase.com",
+        "",
+        `Article reference: ${articleUrl || ""}`,
+      ].join("\n");
+    }
 
     await transporter.sendMail({
       from: `Ravikant Agrawal <${SMTP_USER}>`,

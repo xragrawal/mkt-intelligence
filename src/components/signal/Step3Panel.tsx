@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, ChevronRight, Mail, Edit2, Check, AlertTriangle, RefreshCw, Building2 } from "lucide-react";
+import { Sparkles, Loader2, Trash2, Archive, Users, Briefcase, XCircle, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, ChevronRight, Mail, Edit2, Check, AlertTriangle, RefreshCw, Building2, Newspaper, Linkedin, Facebook, Slack } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { OpportunityCard } from "@/components/signal/OpportunityCard";
@@ -449,8 +449,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   }, [results]);
 
   const handleSendToPartner = async (result: EnrichedResult) => {
-    if (!result.matchedPartner) {
-      toast.error("No contact assigned — assign one first");
+    if (!result.matchedPartner?.email) {
+      toast.error("No recipient email found — please enter and save an email first");
       return;
     }
     const key = result.dbId || result.articleUrl;
@@ -494,9 +494,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
   };
 
   const handleSlackIt = async (result: EnrichedResult) => {
-    if (!result.matchedPartner) {
+    if (!result.matchedPartner?.email) {
       setEditingPartnerId(result.dbId || result.articleUrl);
-      toast.info("Enter a recipient email first, then click Slack it");
+      toast.info("Enter a recipient email and click the checkmark to save it, then click Slack it");
       return;
     }
     const key = result.dbId || result.articleUrl;
@@ -629,11 +629,14 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
         {/* Source Article */}
         <td className="py-2 px-2 align-top" style={{ maxWidth: 160 }}>
           <div className="flex flex-col gap-1">
-            {r.articleSource && (
-              <Badge variant="outline" className={`text-[9px] px-1.5 py-0 w-fit border ${SOURCE_COLORS[r.articleSource as keyof typeof SOURCE_COLORS] || ""}`}>
-                {SOURCE_LABELS[r.articleSource as keyof typeof SOURCE_LABELS] || r.articleSource}
-              </Badge>
-            )}
+            <div className="flex">
+              {r.articleSource === "google_news" && <span title="Google News" className="shrink-0 flex"><Newspaper className="w-3.5 h-3.5 text-muted-foreground" /></span>}
+              {r.articleSource === "linkedin" && <span title="LinkedIn" className="shrink-0 flex"><Linkedin className="w-3.5 h-3.5 text-[#0A66C2]" /></span>}
+              {r.articleSource === "facebook" && <span title="Facebook" className="shrink-0 flex"><Facebook className="w-3.5 h-3.5 text-[#1877F2]" /></span>}
+              {!["google_news", "linkedin", "facebook"].includes(r.articleSource || "") && r.articleSource && (
+                <span className="text-[10px] text-muted-foreground font-medium">{SOURCE_LABELS[r.articleSource as keyof typeof SOURCE_LABELS] || r.articleSource}</span>
+              )}
+            </div>
             {isStale && (
               <span className="text-[9px] px-1.5 py-0 rounded-full bg-amber-100 text-amber-700 border border-amber-200 w-fit">
                 Analysis outdated
@@ -671,8 +674,8 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             {(() => {
               const companyName = r.pack.companyProfile.companyName;
               const parties = [
-                ...(involvedParties || []).filter((p: string) => p !== companyName),
-                ...(sc?.partnerOrSI && sc.partnerOrSI !== companyName ? [sc.partnerOrSI] : []),
+                ...(involvedParties || []).filter((p: string) => p !== companyName && !p.toLowerCase().includes('dji')),
+                ...(sc?.partnerOrSI && sc.partnerOrSI !== companyName && !sc.partnerOrSI.toLowerCase().includes('dji') ? [sc.partnerOrSI] : []),
               ].filter(Boolean);
               
               if (parties.length > 0) {
@@ -772,12 +775,41 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
         {/* Actions */}
         <td className="py-2 px-2 text-right align-top">
           <div className="flex flex-wrap items-center gap-0.5 justify-end">
+            {r.status !== "acted_internally" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleSlackIt(r)}
+                disabled={slackingFor === (r.dbId || r.articleUrl)}
+                className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-[#4A154B]"
+                title="Slack it"
+              >
+                {slackingFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Slack className="w-3 h-3" />}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (!r.matchedPartner) {
+                  setEditingPartnerId(r.dbId || r.articleUrl);
+                  toast.info("Enter an email first");
+                } else {
+                  handleSendToPartner(r);
+                }
+              }}
+              disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
+              className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-primary"
+              title="Draft Email"
+            >
+              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />}
+            </Button>
             {r.status !== "duplicate" && (
-              <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
+              <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("Are you sure you want to mark this as duplicate?")) handleStatusChange(r, "duplicate"); }} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive">
                 Dup
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive text-center">
+            <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("Are you sure you want to delete this record forever?")) handleDelete(r); }} className="text-[10px] h-6 px-1.5 text-muted-foreground hover:text-destructive text-center">
               <Trash2 className="w-3 h-3" />
             </Button>
             <button onClick={() => setExpandedDetailId(expandedDetailId === r.dbId ? null : r.dbId || null)} className="p-1 text-muted-foreground hover:text-foreground">
@@ -861,9 +893,9 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             </span>
           )}
           {sc?.buyingIntentType && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+            <span className="text-[10px] whitespace-normal leading-tight font-medium text-foreground">
               {SIGNAL_LABELS[sc.buyingIntentType as BuyingIntentType] || sc.buyingIntentType}
-            </Badge>
+            </span>
           )}
           {sc?.confidence && (
             <span className={`font-medium ${sc.confidence === "HIGH" ? "text-primary" : sc.confidence === "MEDIUM" ? "text-signal-funding" : "text-muted-foreground"}`}>
@@ -878,6 +910,32 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
           articleSource={r.articleSource} 
           pack={r.pack} 
           onPackUpdate={handlePackUpdate} 
+          onSlackIt={(contact) => {
+            if (!r.matchedPartner?.email || r.matchedPartner.email !== contact.email) {
+              handleEmailSet(r, contact.email || "");
+            }
+            // Need to wait for handleEmailSet to finish or just call handleSlackIt directly with a mock result
+            // that has matchedPartner email set correctly for the request
+            handleSlackIt({
+              ...r,
+              matchedPartner: {
+                name: contact.personName || "Unknown",
+                email: contact.email || ""
+              }
+            });
+          }}
+          onSendEmail={(contact) => {
+            if (!r.matchedPartner?.email || r.matchedPartner.email !== contact.email) {
+              handleEmailSet(r, contact.email || "");
+            }
+            handleSendToPartner({
+              ...r,
+              matchedPartner: {
+                name: contact.personName || "Unknown",
+                email: contact.email || ""
+              }
+            });
+          }}
         />
         <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border bg-muted/20 rounded-b-xl flex-wrap">
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${LEAD_STATUS_COLORS[r.status]}`}>
@@ -895,7 +953,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
                 disabled={slackingFor === (r.dbId || r.articleUrl)}
                 className="text-xs gap-1.5 text-muted-foreground hover:text-[#4A154B]"
               >
-                {slackingFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Briefcase className="w-3.5 h-3.5" />} Slack it
+                {slackingFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Slack className="w-3.5 h-3.5" />} Slack it
               </Button>
             )}
             <Button
@@ -915,7 +973,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Send email
             </Button>
             {r.status !== "duplicate" && (
-              <Button variant="ghost" size="sm" onClick={() => handleStatusChange(r, "duplicate")} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
+              <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("Are you sure you want to mark this as duplicate?")) handleStatusChange(r, "duplicate"); }} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
                 Mark Duplicate
               </Button>
             )}
@@ -930,7 +988,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               {refreshingFor === r.dbId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
               Refresh
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} className="text-muted-foreground hover:text-destructive">
+            <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("Are you sure you want to delete this record forever?")) handleDelete(r); }} className="text-muted-foreground hover:text-destructive">
               <Trash2 className="w-4 h-4" />
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Globe, TrendingUp } from "lucide-react";
+import { Search, Loader2, Filter, AlertTriangle, Database, Eye, LayoutList, LayoutGrid, ExternalLink, ChevronDown, ChevronUp, Globe, TrendingUp, Newspaper, Linkedin, Facebook } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useLLMProvider } from "@/lib/llm-context";
 import { Button } from "@/components/ui/button";
@@ -498,10 +498,11 @@ export function Step2Panel({
                     <td className="py-2.5 pr-2">
                       <div className="line-clamp-1 text-foreground">{sa.article.title}</div>
                       <div className="flex items-center flex-wrap gap-2 text-muted-foreground mt-0.5">
-                        {sa.article.source && (
-                          <Badge variant="outline" className={`text-[9px] px-1.5 py-0 border shrink-0 ${SOURCE_COLORS[sa.article.source as keyof typeof SOURCE_COLORS] || ""}`}>
-                            {SOURCE_LABELS[sa.article.source as keyof typeof SOURCE_LABELS] || sa.article.source}
-                          </Badge>
+                        {sa.article.source === "google_news" && <span title="Google News" className="shrink-0 flex"><Newspaper className="w-3.5 h-3.5 text-muted-foreground" /></span>}
+                        {sa.article.source === "linkedin" && <span title="LinkedIn" className="shrink-0 flex"><Linkedin className="w-3.5 h-3.5 text-[#0A66C2]" /></span>}
+                        {sa.article.source === "facebook" && <span title="Facebook" className="shrink-0 flex"><Facebook className="w-3.5 h-3.5 text-[#1877F2]" /></span>}
+                        {!["google_news", "linkedin", "facebook"].includes(sa.article.source || "") && sa.article.source && (
+                          <span className="text-[10px] text-muted-foreground font-medium">{SOURCE_LABELS[sa.article.source as keyof typeof SOURCE_LABELS] || sa.article.source}</span>
                         )}
                         <span>{sa.article.publishing_agency || "—"}</span>
                         {sa.article.published_at && (
@@ -527,8 +528,8 @@ export function Step2Panel({
                       {(() => {
                         const parties = [
                           ...(sa.scan.company ? [sa.scan.company] : []),
-                          ...(sa.scan.involvedParties || []).filter(p => p !== sa.scan.company),
-                          ...(sa.scan.partnerOrSI && sa.scan.partnerOrSI !== sa.scan.company ? [sa.scan.partnerOrSI] : []),
+                          ...(sa.scan.involvedParties || []).filter(p => p !== sa.scan.company && !p.toLowerCase().includes('dji')),
+                          ...(sa.scan.partnerOrSI && sa.scan.partnerOrSI !== sa.scan.company && !sa.scan.partnerOrSI.toLowerCase().includes('dji') ? [sa.scan.partnerOrSI] : []),
                         ].filter(Boolean);
                         const display = parties.length > 0 ? parties.join(", ") : "—";
                         return <span className="line-clamp-2 break-words leading-tight" title={display}>{display}</span>;
@@ -547,9 +548,9 @@ export function Step2Panel({
                     </td>
                     <td className="py-2.5 pr-2 text-foreground tabular-nums">{sa.scan.dealValue || "—"}</td>
                     <td className="py-2.5 pr-2">
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 whitespace-normal leading-tight">
+                      <span className="text-[10px] whitespace-normal leading-tight font-medium text-foreground">
                         {SIGNAL_LABELS[sa.scan.buyingIntentType]}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="py-2.5 pr-2 text-center">
                       <span className="font-display font-bold text-primary tabular-nums">{sa.scan.bdImpactScore}</span>

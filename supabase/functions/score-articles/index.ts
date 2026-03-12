@@ -114,7 +114,7 @@ const BATCH_SCORING_TOOL = {
               whyItMatters: { type: "string" },
               confidence: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
             },
-            required: ["articleIndex", "buyingIntentType", "leadClarityScore", "buyingIntentScore", "sourceQualityScore", "bdImpactScore", "whyItMatters", "confidence"],
+            required: ["articleIndex", "buyingIntentType", "useCaseCategory", "leadClarityScore", "buyingIntentScore", "sourceQualityScore", "bdImpactScore", "whyItMatters", "confidence"],
             additionalProperties: false,
           },
         },
@@ -259,6 +259,7 @@ const LINKEDIN_SCORING_TOOL = {
             required: [
               "articleIndex",
               "buyingIntentType",
+              "useCaseCategory",
               "leadClarityScore",
               "buyingIntentScore",
               "sourceQualityScore",
