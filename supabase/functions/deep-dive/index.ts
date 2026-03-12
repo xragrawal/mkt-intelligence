@@ -367,6 +367,20 @@ serve(async (req) => {
       `URL: ${url}`,
     ];
 
+    // Best-effort fetch of full article content so LLM can see POCs/parties inside body text
+    let articleBody = "";
+    try {
+      const resp = await fetch(url, { method: "GET" });
+      if (resp.ok) {
+        const html = await resp.text();
+        // Truncate to keep token usage sane while still giving plenty of context
+        const maxChars = 20000;
+        articleBody = html.slice(0, maxChars);
+      }
+    } catch {
+      // If fetch fails, we still proceed with title + context only
+    }
+
     if (scanContext) {
       contextParts.push(`\nStep 2 Scoring Context:`);
       if (scanContext.company) contextParts.push(`Company: ${scanContext.company}`);
@@ -378,6 +392,10 @@ serve(async (req) => {
       if (scanContext.unitsMentioned) contextParts.push(`Units Mentioned: ${scanContext.unitsMentioned}`);
       if (scanContext.emailsMentioned?.length) contextParts.push(`Emails: ${scanContext.emailsMentioned.join(", ")}`);
       if (scanContext.phonesMentioned?.length) contextParts.push(`Phones: ${scanContext.phonesMentioned.join(", ")}`);
+    }
+
+    if (articleBody) {
+      contextParts.push(`\nRaw Article Content (truncated):\n${articleBody}`);
     }
 
     const result = await callLLM({
