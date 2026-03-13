@@ -32,7 +32,7 @@ export function Header() {
             }`}
           >
             <Users className="w-4 h-4" />
-            Test Enrich Agent
+            Data Enrichment Agent
           </Link>
           <Link
             to="/trends"

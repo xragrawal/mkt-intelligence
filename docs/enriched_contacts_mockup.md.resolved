@@ -1,0 +1,105 @@
+# Step 3: Enriched Contacts UI/UX Mockup
+
+*Based on user feedback, here is a proposal for how multiple contacts (from potentially different companies, titles, and with different emails) would look inside the expanded [OpportunityCard](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/components/signal/OpportunityCard.tsx#28-156) in Step 3.*
+
+---
+
+## 1. Tabular View (Collapsed Row)
+
+Instead of cluttering the main table row with all contacts, we show the **Primary Lead** (highest priority, verified email) and a count of others.
+
+| # | Article/Title | Involved Parties | Use Case | Primary POC | Primary Email | Location | Status | Actions |
+|---|---|---|---|---|---|---|---|---|
+| 1 | **Kansas City Police Expand DFR...**<br><span style="color:gray; font-size:10px;">Google News</span> | **Kansas City Police...**<br><span style="font-size:11px;">[Website ↗](https://kcpd.org)</span> | Public Safety | **Stacey Graves**<br><span style="color:gray; font-size:10px;">Chief of Police</span> | `stacey.graves@kcpd.org`<br>**<span style="border:1px solid lightgray; border-radius:12px; padding: 2px 6px; font-size:10px; background-color: #E6F4EA; color: #1e8e3e;">✓ Valid</span>**<br><span style="color:gray; font-size:10px;">+4 more contacts</span> | US | <span style="background-color:#E8EAF6; color:#3F51B5; padding: 4px; border-radius: 4px;">Open</span> | ... |
+
+---
+
+## 2. Expanded Detail View ([OpportunityCard](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/components/signal/OpportunityCard.tsx#28-156))
+
+When the user clicks the row to expand it, they see the usual sections (**Organisation Profile**, **Market Signal**, etc.). We add a new section: **Enriched Contacts & Involved Parties**.
+
+We group contacts by **Company** so that different stakeholders (e.g., the buyer vs the partner/integrator) are visually separated. Each contact has a direct "Email" action.
+
+### ▼ Enriched Contacts & Involved Parties
+
+**Kansas City Police Department** (Deployment Lead)
+*Website: [kcpd.org](https://kcpd.org) ✏️*
+<div style="border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 12px; overflow: hidden;">
+  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+    <tr style="background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0; text-align: left; color: #64748B;">
+      <th style="padding: 8px 12px;">Person & Role</th>
+      <th style="padding: 8px 12px;">Email</th>
+      <th style="padding: 8px 12px; text-align: right;">Actions</th>
+    </tr>
+    <tr style="border-bottom: 1px solid #E2E8F0; background-color: #ffffff;">
+      <td style="padding: 12px;">
+        <div style="font-weight: 500; display: flex; align-items: center; gap: 6px;">Stacey Graves <span style="font-size: 10px; cursor: pointer;" title="Edit Name">✏️</span></div>
+        <div style="color: #64748B; font-size: 11px; display: flex; align-items: center; gap: 6px;">Chief of Police <span style="font-size: 10px; cursor: pointer;" title="Edit Title">✏️</span></div>
+      </td>
+      <td style="padding: 12px;">
+        <div style="font-family: monospace; font-size: 12px; display: flex; align-items: center; gap: 6px;">stacey.graves@kcpd.org <span style="font-size: 10px; cursor: pointer;" title="Edit Email">✏️</span></div>
+        <div style="margin-top: 4px;">
+          <span style="border:1px solid #BBF7D0; border-radius:12px; padding: 2px 6px; font-size:10px; background-color: #DCFCE7; color: #166534; display: inline-flex; align-items: center; gap: 4px;">✓ Valid</span>
+        </div>
+      </td>
+      <td style="padding: 12px; text-align: right;">
+        <button style="border: 1px solid #E2E8F0; background: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-right: 4px;" title="Send Slack DM for Approval">💬 Slack It</button>
+        <button style="border: 1px solid #E2E8F0; background: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;" title="Open email draft for this contact">📧 Draft Email</button>
+      </td>
+    </tr>
+    <tr style="background-color: #ffffff;">
+      <td style="padding: 12px;">
+        <div style="font-weight: 500; display: flex; align-items: center; gap: 6px;">Gregory Williams <span style="font-size: 10px; cursor: pointer;" title="Edit Name">✏️</span></div>
+        <div style="color: #64748B; font-size: 11px; display: flex; align-items: center; gap: 6px;">Major, DFR Program Director <span style="font-size: 10px; cursor: pointer;" title="Edit Title">✏️</span></div>
+      </td>
+      <td style="padding: 12px;">
+        <div style="font-family: monospace; font-size: 12px; display: flex; align-items: center; gap: 6px;">gregory.williams@kcpd.org <span style="font-size: 10px; cursor: pointer;" title="Edit Email">✏️</span></div>
+        <div style="margin-top: 4px;">
+          <span style="border:1px solid #BBF7D0; border-radius:12px; padding: 2px 6px; font-size:10px; background-color: #DCFCE7; color: #166534; display: inline-flex; align-items: center; gap: 4px;">✓ Valid</span>
+        </div>
+      </td>
+      <td style="padding: 12px; text-align: right;">
+        <button style="border: 1px solid #E2E8F0; background: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-right: 4px;" title="Send Slack DM for Approval">💬 Slack It</button>
+        <button style="border: 1px solid #E2E8F0; background: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;" title="Open email draft for this contact">📧 Draft Email</button>
+      </td>
+    </tr>
+  </table>
+</div>
+
+**DroneSense** (Technology Partner)
+*Website: [dronesense.com](https://dronesense.com) ✏️*
+<div style="border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 12px; overflow: hidden;">
+  <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+    <tr style="background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0; text-align: left; color: #64748B;">
+      <th style="padding: 8px 12px;">Person & Role</th>
+      <th style="padding: 8px 12px;">Email</th>
+      <th style="padding: 8px 12px; text-align: right;">Actions</th>
+    </tr>
+    <tr style="background-color: #ffffff;">
+      <td style="padding: 12px;">
+        <div style="font-style: italic; color: #64748B; display: flex; align-items: center; gap: 6px;">Unknown Name <span style="font-size: 10px; cursor: pointer;" title="Edit Name">✏️</span></div>
+        <div style="color: #64748B; font-size: 11px; display: flex; align-items: center; gap: 6px;">Technology Partner <span style="font-size: 10px; cursor: pointer;" title="Edit Title">✏️</span></div>
+      </td>
+      <td style="padding: 12px;">
+        <div style="font-family: monospace; font-size: 12px; display: flex; align-items: center; gap: 6px;">info@dronesense.com <span style="font-size: 10px; cursor: pointer;" title="Edit Email">✏️</span></div>
+        <div style="margin-top: 4px;">
+          <span style="border:1px solid #FECDD3; border-radius:12px; padding: 2px 6px; font-size:10px; background-color: #FFE4E6; color: #9F1239; display: inline-flex; align-items: center; gap: 4px;">✗ Invalid</span>
+        </div>
+      </td>
+      <td style="padding: 12px; text-align: right;">
+        <button style="border: 1px solid #E2E8F0; background: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-right: 4px; opacity: 0.5;" title="Email invalid" disabled>💬 Slack It</button>
+        <button style="border: 1px solid #E2E8F0; background: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; opacity: 0.5;" disabled title="Email invalid">📧 Draft Email</button>
+      </td>
+    </tr>
+  </table>
+</div>
+
+---
+
+### UX Rationale (Updated)
+1. **Contextual Actions:** 
+   - **Draft Email**: Clicking "Draft Email" on a specific contact row will open a modal/interface showing a custom drafted email pre-populated for *that specific contact*. The user will be able to review the auto-generated email, make any manual edits, and then either send or discard it from this stage.
+   - **Slack It**: Same concept. Clicking "Slack It" on a contact's row sends the approval request to Slack prepopulated with *that specific target*. Both actions live next to the contact. We will remove the generic "Send Email" / "Slack it" from the top-level table row actions since it is ambiguous when there are multiple contacts.
+2. **Inline Editability:** A persistent edit icon (✏️) or an interactive, frameless input structure will exist on every field (Name, Title, Email, Website) across all contacts. Changes to these inputs will instantly save to the DB array so the user never loses edits.
+   - **Hunter Re-validation**: If the user edits an *Email* field, we will trigger a backend call to re-verify the new email using the Hunter API, updating the Valid/Invalid badge dynamically.
+3. **Valid/Invalid Checks**: If an email is Invalid, the action buttons will grey out to prevent sending bouncy emails unless the user steps in and edits the email manually.

@@ -211,11 +211,17 @@ function ContactsList({ contacts, dbId, pack, onPackUpdate, onSlackIt, onSendEma
     <div className="space-y-6">
       {Object.entries(grouped).map(([company, compContacts]) => (
         <div key={company} className="space-y-3 border border-border rounded-lg p-4 bg-muted/10">
-          <div className="flex items-center gap-2 border-b border-border/50 pb-2">
+          <div className="flex items-center gap-3 border-b border-border/50 pb-2 flex-wrap">
             <h4 className="font-semibold text-sm text-foreground">{company}</h4>
+            {/* Lead type badge from first contact */}
+            {compContacts[0]?.leadType && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                {compContacts[0].leadType}
+              </span>
+            )}
             {compContacts[0]?.companyWebsite && (
-              <a href={compContacts[0].companyWebsite.startsWith('http') ? compContacts[0].companyWebsite : `https://${compContacts[0].companyWebsite}`} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">
-                {compContacts[0].companyWebsite.length > 30 ? "Website ↗" : compContacts[0].companyWebsite + (compContacts[0].companyWebsite.endsWith('↗') ? '' : ' ↗')}
+              <a href={compContacts[0].companyWebsite.startsWith('http') ? compContacts[0].companyWebsite : `https://${compContacts[0].companyWebsite}`} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline inline-flex items-center gap-0.5 ml-auto">
+                {compContacts[0].companyDomain || "Website"} <ExternalLink className="w-2.5 h-2.5" />
               </a>
             )}
           </div>
@@ -332,7 +338,17 @@ function ContactRow({ contact, onUpdate, onSlackIt, onDraftEmail }: { contact: E
             {/* Name & Title */}
             <div className="min-w-[150px] flex items-center gap-2">
               <div>
-                <p className="font-medium text-foreground truncate">{contact.personName || "Unknown Name"}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="font-medium text-foreground truncate">{contact.personName || "Unknown Name"}</p>
+                  {/* Source badge: Article (gray) or Apollo (blue) */}
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-medium ${
+                    contact.source === "apollo"
+                      ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800"
+                      : "bg-muted text-muted-foreground border-border"
+                  }`}>
+                    {contact.source === "apollo" ? "Apollo" : "Article"}
+                  </span>
+                </div>
                 <p className="text-[11px] text-muted-foreground truncate">{contact.title || "Unknown Role"}</p>
               </div>
               <button onClick={() => setIsEditing(true)} className="p-1 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
@@ -350,6 +366,12 @@ function ContactRow({ contact, onUpdate, onSlackIt, onDraftEmail }: { contact: E
                 <span className="w-2 h-2 rounded-full bg-red-500" title="Invalid / Not Found"/>
               )}
             </div>
+            {/* LinkedIn icon */}
+            {contact.linkedinUrl && (
+              <a href={contact.linkedinUrl} target="_blank" rel="noreferrer" className="text-[#0A66C2] hover:opacity-80" title="View on LinkedIn">
+                <Linkedin className="w-3.5 h-3.5" />
+              </a>
+            )}
           </>
         )}
       </div>

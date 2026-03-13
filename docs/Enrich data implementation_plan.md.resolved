@@ -1,0 +1,79 @@
+# Integrate Data Enrichment Agent into Step 3
+
+This plan describes how we will integrate the newly tested data enrichment logic (Jina fetch + GPT-4o extraction + Apollo search + Hunter verification) natively into the Step 3: Deep Dive pipeline.
+
+## User Review Required
+> [!IMPORTANT]
+> - Integrating Jina + GPT-4o + Apollo + Hunter directly into the `deep-dive` Edge Function will increase the processing time of a single deep dive by 30-90 seconds. 
+> - I will modify `deep-dive` to run the contact enrichment steps in parallel with the main `DEEP_DIVE_PROMPT` (using Promise.all) to save time, and then combine the results before saving to the DB.
+> - I will add `enriched_contacts` JSONB column to the `opportunity_packs` table to store this detailed array.
+
+## Proposed Changes
+
+### Database Migration
+#### [NEW] `supabase/migrations/20260313_add_enriched_contacts.sql`
+- Add `enriched_contacts JSONB DEFAULT '[]'::jsonb` to `opportunity_packs` to store the array of [EnrichedContact](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#9-25) objects.
+
+### Backend Extraction & Storage
+#### [MODIFY] [supabase/functions/deep-dive/index.ts](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/deep-dive/index.ts)
+- Copy the helper functions from [enrich-contacts-test/index.ts](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts) ([fetchArticleContent](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#26-41), [callOpenAI](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#42-68), [parseJSON](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#69-82), [apolloSearchExecutives](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#152-186), [apolloFindCompanyDomain](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#187-208), [verifyEmailWithHunter](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#209-222), [EXTRACTION_PROMPT](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#83-151)).
+- Update the main request handler:
+  1. Fetch article from Jina (instead of the basic GET fetch).
+  2. Run the main `DEEP_DIVE_PROMPT` to get the opportunity pack using the Jina content as context.
+  3. In parallel (or sequentially if needed), run the [EXTRACTION_PROMPT](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#83-151) via [callOpenAI](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#42-68).
+  4. Run the Apollo and Hunter steps on the extracted contacts.
+  5. Combine the data and save `enriched_contacts` into the `opportunity_packs` insert/update map.
+- Remove `phones_mentioned` from the database payload if superseded, or keep it as is and just write `enriched_contacts`.
+
+#### [NEW/MODIFY] `supabase/functions/verify-email/index.ts`
+- We will need a dedicated endpoint (or add functionality to an existing one) that takes an `email` string and calls the Hunter API to verify it. This is required because Edge Functions abstract the Hunter API Key away from the React frontend.
+- When an email is edited, the frontend will call this function to instantly re-validate the email and update the badge.
+
+#### [DELETE] [supabase/functions/enrich-contacts-test/index.ts](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts) (Optional)
+- We can delete this test function or keep it around for debugging. I will keep it untouched unless requested.
+
+### Frontend Type Definitions
+#### [MODIFY] [src/lib/types.ts](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/lib/types.ts)
+- Add [EnrichedContact](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/supabase/functions/enrich-contacts-test/index.ts#9-25) interface.
+- Add `enrichedContacts?: EnrichedContact[];` to the [OpportunityPack](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/lib/types.ts#66-89) interface or [EnrichedResult](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/components/signal/Step3Panel.tsx#18-56) wrapper so the frontend can read it.
+- Make sure `supabase/types.ts` (if it exists) is updated or we just rely on the JSON types.
+
+### Frontend Display & Interaction
+#### [MODIFY] [src/components/signal/Step3Panel.tsx](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/components/signal/Step3Panel.tsx)
+- **Navigation**: Keep the `TEST AGENT` (EnrichTest) navigation CTA somewhere at the top, perhaps near the "Trends" button.
+- **Top Bar**: Remove the 'Partner' / "Partners" CTA from the navigation.
+- **Data Loading**: Load `enriched_contacts` from the database in [loadExistingPacks](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/components/signal/Step3Panel.tsx#114-181).
+- **Delete Refresh Action**: Remove the "Refresh analysis" from the actions column. *Explanation of Refresh*: Previously, "Refresh analysis" would re-run the `deep-dive` LLM prompt on the same article to regenerate the intelligence pack (useful if prompt was changed or LLM failed), but we can remove it to simplify the UI as requested. Keep 'Dup' and 'Delete' in the main list.
+- **Remove Generic Actions**: Remove "Slack it" and "Send Email" from the generic top-level table row actions because they are ambiguous when dealing with multiple enriched contacts. These actions will move to the expanded details view per-contact.
+- **Tabular View Simplification**: 
+  - Instead of trying to cram all contacts into the table view, we will maintain a simplified view. 
+  - For the **Involved Parties** column, display the primary company name and ideally its `companyWebsite` (as an external link) if available from enriched data. To prevent table distortion, long URLs will simply render as `Website ↗`.
+  - For the **Primary POC** column in the table, show the *Primary* POC (highest priority/best email). Display the name, job title, and the email address. We can add a simple badge for the Hunter verification status limit clutter (e.g., a green check for valid, red cross for invalid). Add an indicator like `+2 more` if there are multiple contacts.
+  - Keep involved parties simple, or just rely on the detailed view.
+
+#### [MODIFY] [src/components/signal/OpportunityCard.tsx](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/components/signal/OpportunityCard.tsx)
+- Introduce a new "Enriched Contacts & Involved Parties" CollapsibleSection.
+- Clean up the UI to represent the data beautifully. Do not blindly copy the test table.
+- We will omit `leadPriority`, `emailConfidence` (text version), and `leadType` if they clutter the view.
+- For each contact, display:
+  - **Name & Title**: Stacked or side-by-side. 
+  - **Company & Website**: The organization they belong to.
+  - **Email**: With a clean, minimal Valid/Invalid indicator based on `hunterVerified`.
+  - **LinkedIn**: As a subtle icon link.
+- **Editable Fields**: Add inline editability (or pencil icons) for Name, Title, Email, and Website, auto-saving back to the `enriched_contacts` array in the database.
+  - *Note*: Specifically for the Email field, saving a new email will trigger a call to the new `verify-email` Edge Function to re-validate it with Hunter and update the local state/DB with the new status.
+- **Contextual Actions**: Add "Slack It" and "Draft Email" buttons to each contact row.
+  - "Slack It": Sends the approval flow for this specific person.
+  - "Draft Email": Opens a modal/interface where the user can view the pre-drafted contextual email for this specific contact, edit it, and then explicitly Send or Discard it. (Note: Email sending logic itself is mostly integrated, just needs adapting to this modal flow).
+
+## Verification Plan
+
+### Automated Tests
+- Run `npm run type-check` to confirm no TypeScript drifts.
+
+### Manual Verification
+1. Open the application locally.
+2. Select an article in Step 2 that hasn't been deep-dived yet.
+3. Click "Deep Dive" and wait for the analysis to finish.
+4. Verify the new row in the DB `opportunity_packs` has `enriched_contacts` populated.
+5. In Step 3, expand the detail row to ensure the `Enriched Contacts` table renders identically to the [EnrichTest](file:///Users/ravikantagrawal/Documents/All%20things%20Flytbase/Growth-hacking-tool/mkt-intel-leadgen/bd-pulse-leadgen/src/pages/EnrichTest.tsx#174-347) page, with correct formatting, source labels (Article vs Apollo), and confidence badges.

@@ -75,7 +75,7 @@ export interface EnrichedContact {
   emailConfidence: "Verified" | "Estimated" | "Not Found";
   hunterVerified?: boolean | null;
   source: "article" | "apollo";
-  leadType: "Deployment Lead" | "Technology Partner" | "Potential Customer" | "Government / Regulator" | "Informational / Low Priority";
+  leadType: string;
   leadPriority: "High" | "Medium" | "Low";
   notes: string | null;
 }
