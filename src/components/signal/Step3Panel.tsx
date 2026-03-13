@@ -164,6 +164,7 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
               opportunityScore: row.opportunity_score || 0,
             },
             crmReadyNotes: row.crm_ready_notes || "",
+            enrichedContacts: Array.isArray(row.enriched_contacts) ? row.enriched_contacts : [],
           },
           scanContext: {
             phonesMentioned: row.phones_mentioned || [],
@@ -260,7 +261,10 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             articleUrl: sa.article.url,
             articleTitle: sa.article.title,
             articleSource: sa.article.source,
-            pack: data.pack,
+            pack: {
+              ...data.pack,
+              enrichedContacts: data.enrichedContacts || [],
+            },
             dbId: data.dbId,
             status: "open",
             createdAt: new Date().toISOString(),
@@ -945,49 +949,12 @@ export function Step3Panel({ selectedArticles, enabled, collectionRun }: Step3Pa
             <span className="text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</span>
           )}
           <div className="flex items-center gap-1 ml-auto flex-wrap">
-            {r.status !== "acted_internally" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleSlackIt(r)}
-                disabled={slackingFor === (r.dbId || r.articleUrl)}
-                className="text-xs gap-1.5 text-muted-foreground hover:text-[#4A154B]"
-              >
-                {slackingFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Slack className="w-3.5 h-3.5" />} Slack it
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (!r.matchedPartner) {
-                  setEditingPartnerId(r.dbId || r.articleUrl);
-                  toast.info("Enter an email first");
-                } else {
-                  handleSendToPartner(r);
-                }
-              }}
-              disabled={sendingEmailFor === (r.dbId || r.articleUrl)}
-              className="text-xs gap-1.5 text-muted-foreground hover:text-primary"
-            >
-              {sendingEmailFor === (r.dbId || r.articleUrl) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Send email
-            </Button>
+
             {r.status !== "duplicate" && (
               <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("Are you sure you want to mark this as duplicate?")) handleStatusChange(r, "duplicate"); }} className="text-xs gap-1.5 text-muted-foreground hover:text-destructive">
                 Mark Duplicate
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRefreshAnalysis(r)}
-              disabled={refreshingFor === r.dbId}
-              className="text-xs gap-1.5 text-muted-foreground hover:text-primary"
-              title="Re-run deep-dive with latest intelligence"
-            >
-              {refreshingFor === r.dbId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Refresh
-            </Button>
             <Button variant="ghost" size="sm" onClick={() => { if (window.confirm("Are you sure you want to delete this record forever?")) handleDelete(r); }} className="text-muted-foreground hover:text-destructive">
               <Trash2 className="w-4 h-4" />
             </Button>
